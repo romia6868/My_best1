@@ -122,35 +122,34 @@ def generate_class_image():
 # חיתוך פנים
 # -------------------------
 def extract_faces(image, confidence_threshold=0.7):
-    import mediapipe as mp
     img_rgb = np.array(image.convert("RGB"))
-    mp_face_detection = mp.solutions.face_detection
     faces = []
-    with mp_face_detection.FaceDetection(
-        model_selection=1,
-        min_detection_confidence=confidence_threshold
-    ) as detector:
-        results = detector.process(img_rgb)
-        if not results.detections:
-            return faces, img_rgb
-        h, w = img_rgb.shape[:2]
-        for det in results.detections:
-            box = det.location_data.relative_bounding_box
-            x1 = max(0, int(box.xmin * w))
-            y1 = max(0, int(box.ymin * h))
-            x2 = min(w, int((box.xmin + box.width) * w))
-            y2 = min(h, int((box.ymin + box.height) * h))
-            pad_x = int(0.2 * (x2 - x1))
-            pad_y = int(0.2 * (y2 - y1))
-            x1 = max(0, x1 - pad_x)
-            y1 = max(0, y1 - pad_y)
-            x2 = min(w, x2 + pad_x)
-            y2 = min(h, y2 + pad_y)
+    try:
+        face_objs = DeepFace.extract_faces(
+            img_path=img_rgb,
+            detector_backend="retinaface",
+            enforce_detection=False,
+            align=True
+        )
+        for face_obj in face_objs:
+            if face_obj["confidence"] < confidence_threshold:
+                continue
+            region = face_obj["facial_area"]
+            x, y, w, h = region["x"], region["y"], region["w"], region["h"]
+            # padding
+            pad_x = int(0.2 * w)
+            pad_y = int(0.2 * h)
+            x1 = max(0, x - pad_x)
+            y1 = max(0, y - pad_y)
+            x2 = min(img_rgb.shape[1], x + w + pad_x)
+            y2 = min(img_rgb.shape[0], y + h + pad_y)
             face = img_rgb[y1:y2, x1:x2]
             if face.size == 0:
                 continue
             face_img = Image.fromarray(face).resize((160, 160))
             faces.append({"face": face_img, "box": (x1, y1, x2-x1, y2-y1)})
+    except Exception as e:
+        st.warning(f"שגיאה בזיהוי פנים: {e}")
     return faces, img_rgb
 # -------------------------
 # cosine distance
