@@ -75,9 +75,20 @@ reference_photos = load_reference_photos()
 # יצירת תמונה רנדומלית
 # -------------------------
 def generate_class_image():
-    bg = cv2.imread(BACKGROUND)
+    background_options = [
+        os.path.join(BASE_DIR, "הורדה.jfif"),
+        os.path.join(BASE_DIR, "images (1).jfif"),
+        os.path.join(BASE_DIR, "images.jfif"),
+        os.path.join(BASE_DIR, "images (2).jfif"),
+    ]
+    available_backgrounds = [b for b in background_options if os.path.exists(b)]
+    if not available_backgrounds:
+        st.error("לא נמצאו תמונות רקע")
+        st.stop()
+    chosen_bg = random.choice(available_backgrounds)
+    bg = cv2.imread(chosen_bg)
     if bg is None:
-        st.error("Background image not found")
+        st.error(f"לא ניתן לטעון את הרקע: {chosen_bg}")
         st.stop()
     bg = cv2.resize(bg, (900, 600), interpolation=cv2.INTER_CUBIC)
     students = os.listdir(REFERENCE_DIR)
