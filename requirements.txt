@@ -4,3 +4,4 @@ Pillow==10.2.0
 deepface==0.0.93
 mediapipe==0.10.9
 tf-keras
+opencv-python-headless
