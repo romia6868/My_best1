@@ -274,4 +274,12 @@ if mode == "📤 העלאת תמונה":
 
 elif mode == "🎲 הגרלת תמונה רנדומלית":
     if st.button("צור תמונת כיתה רנדומלית"):
-        bg_img, pre
+        bg_img, present = generate_class_image()
+        bg_rgb = cv2.cvtColor(bg_img, cv2.COLOR_BGR2RGB)
+        pil_image = Image.fromarray(bg_rgb)
+        st.subheader("התמונה הרנדומלית שנוצרה")
+        st.image(pil_image, use_column_width=True)
+        st.write("נוכחים אמיתיים:", present)
+        st.divider()
+        st.subheader("תוצאות הזיהוי האוטומטי")
+        recognize_faces(pil_image, confidence, threshold)
