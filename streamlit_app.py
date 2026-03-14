@@ -195,8 +195,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
         if best_name and best_name not in present_students:
             present_students[best_name] = img  # ← תמונה מהתמונה הכיתתית
-            recognized_faces.append({"name": best_name, "box": box})
-
+            recognized_faces.append({"name": best_name, "box": box, "dist": best_dist})
     # ציור תיבות
     from PIL import ImageFont
 
