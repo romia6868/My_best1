@@ -124,9 +124,12 @@ def generate_class_image():
 def extract_faces(image, confidence_threshold=0.7):
     import mediapipe as mp
     img_rgb = np.array(image.convert("RGB"))
-    mp_face = mp.solutions.face_detection
+    mp_face_detection = mp.solutions.face_detection
     faces = []
-    with mp_face.FaceDetection(model_selection=1, min_detection_confidence=confidence_threshold) as detector:
+    with mp_face_detection.FaceDetection(
+        model_selection=1,
+        min_detection_confidence=confidence_threshold
+    ) as detector:
         results = detector.process(img_rgb)
         if not results.detections:
             return faces, img_rgb
@@ -149,7 +152,6 @@ def extract_faces(image, confidence_threshold=0.7):
             face_img = Image.fromarray(face).resize((160, 160))
             faces.append({"face": face_img, "box": (x1, y1, x2-x1, y2-y1)})
     return faces, img_rgb
-
 # -------------------------
 # cosine distance
 # -------------------------
