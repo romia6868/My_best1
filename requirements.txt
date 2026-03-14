@@ -5,3 +5,4 @@ deepface==0.0.93
 mediapipe
 tf-keras
 opencv-python-headless
+rembg
