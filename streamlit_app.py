@@ -6,6 +6,7 @@ import os
 import zipfile
 import random
 import cv2
+from rembg import remove
 
 st.set_page_config(page_title="מערכת נוכחות חכמה", layout="wide")
 st.title("📸 מערכת נוכחות חכמה")
@@ -88,6 +89,10 @@ def generate_class_image():
     cell_h = bg.shape[0] // rows
     positions = [(c * cell_w, r * cell_h) for r in range(rows) for c in range(cols)]
     random.shuffle(positions)
+
+    # המרת הרקע ל-PIL RGBA פעם אחת
+    bg_pil = Image.fromarray(cv2.cvtColor(bg, cv2.COLOR_BGR2RGB)).convert("RGBA")
+
     i = 0
     for name in present:
         if i < len(positions):
@@ -99,13 +104,19 @@ def generate_class_image():
                 if face is not None:
                     new_w = int(cell_w * 0.8)
                     new_h = int(cell_h * 0.8)
-                    face = cv2.resize(face, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
+                    # הסרת רקע
+                    face_pil = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
+                    face_no_bg = remove(face_pil).resize((new_w, new_h))
+                    # הדבקה עם שקיפות
                     x, y = positions[i]
                     x = x + (cell_w - new_w) // 2
                     y = y + (cell_h - new_h) // 2
-                    bg[y:y+new_h, x:x+new_w] = face
+                    bg_pil.paste(face_no_bg, (x, y), face_no_bg)
                     i += 1
-    return bg, present
+
+    # המרה חזרה ל-RGB
+    result_img = bg_pil.convert("RGB")
+    return np.array(result_img), present
 
 def extract_faces(image, confidence_threshold=0.7):
     img_rgb = np.array(image.convert("RGB"))
@@ -177,7 +188,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             present_students[best_name] = img
             recognized_faces.append({"name": best_name, "box": box, "dist": best_dist})
 
-    # ציור תיבות
+    # ציור תיבות על התמונה המקורית (לא שכפול)
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
 
@@ -190,8 +201,8 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     font_conf = None
     for path in font_paths:
         if os.path.exists(path):
-            font_name = ImageFont.truetype(path, 32)   # ← שם: גודל 32
-            font_conf = ImageFont.truetype(path, 20)   # ← אחוזים: גודל 20
+            font_name = ImageFont.truetype(path, 32)
+            font_conf = ImageFont.truetype(path, 20)
             break
     if font_name is None:
         font_name = ImageFont.load_default(size=32)
@@ -201,8 +212,8 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         x, y, w, h = face["box"]
         confidence_pct = int((1 - face["dist"]) * 100)
         draw.rectangle([x, y, x+w, y+h], outline=(0,255,0), width=3)
-        draw.text((x, y-42), face["name"], fill=(0,255,0), font=font_name)      # ירוק
-        draw.text((x, y-20), f"{confidence_pct}%", fill=(0,220,255), font=font_conf)  # ← תכלת
+        draw.text((x, y-42), face["name"], fill=(0,255,0), font=font_name)
+        draw.text((x, y-20), f"{confidence_pct}%", fill=(0,220,255), font=font_conf)
 
     st.subheader("תוצאת זיהוי")
     st.image(img_draw, use_column_width=True)
@@ -211,7 +222,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
     st.divider()
 
-    # נוכחים וחסרים זה לצד זה
     col1, col2 = st.columns(2)
 
     with col1:
@@ -274,9 +284,9 @@ if mode == "📤 העלאת תמונה":
 
 elif mode == "🎲 הגרלת תמונה רנדומלית":
     if st.button("צור תמונת כיתה רנדומלית"):
-        bg_img, present = generate_class_image()
-        bg_rgb = cv2.cvtColor(bg_img, cv2.COLOR_BGR2RGB)
-        pil_image = Image.fromarray(bg_rgb)
+        with st.spinner("מייצר תמונת כיתה..."):
+            result_img, present = generate_class_image()
+        pil_image = Image.fromarray(result_img)
         st.subheader("התמונה הרנדומלית שנוצרה")
         st.image(pil_image, use_column_width=True)
         st.write("נוכחים אמיתיים:", present)
