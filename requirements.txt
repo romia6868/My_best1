@@ -2,6 +2,6 @@ streamlit==1.32.2
 numpy==1.26.4
 Pillow==10.2.0
 deepface==0.0.93
-mediapipe==0.10.9
+mediapipe
 tf-keras
 opencv-python-headless
