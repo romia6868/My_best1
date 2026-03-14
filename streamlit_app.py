@@ -190,19 +190,19 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     font_conf = None
     for path in font_paths:
         if os.path.exists(path):
-            font_name = ImageFont.truetype(path, 52)
-            font_conf = ImageFont.truetype(path, 32)
+            font_name = ImageFont.truetype(path, 32)   # ← שם: גודל 32
+            font_conf = ImageFont.truetype(path, 20)   # ← אחוזים: גודל 20
             break
     if font_name is None:
-        font_name = ImageFont.load_default(size=52)
-        font_conf = ImageFont.load_default(size=32)
+        font_name = ImageFont.load_default(size=32)
+        font_conf = ImageFont.load_default(size=20)
 
     for face in recognized_faces:
         x, y, w, h = face["box"]
         confidence_pct = int((1 - face["dist"]) * 100)
         draw.rectangle([x, y, x+w, y+h], outline=(0,255,0), width=3)
-        draw.text((x, y-60), face["name"], fill=(0,255,0), font=font_name)
-        draw.text((x, y-28), f"{confidence_pct}%", fill=(255,255,0), font=font_conf)
+        draw.text((x, y-42), face["name"], fill=(0,255,0), font=font_name)      # ירוק
+        draw.text((x, y-20), f"{confidence_pct}%", fill=(0,220,255), font=font_conf)  # ← תכלת
 
     st.subheader("תוצאת זיהוי")
     st.image(img_draw, use_column_width=True)
@@ -211,33 +211,37 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
     st.divider()
 
-    # ✅ נוכחים
-    st.header(f"✅ נוכחים ({len(present_students)})")
-    if present_students:
-        cols = st.columns(5)
-        for i, (name, img) in enumerate(present_students.items()):
-            with cols[i % 5]:
-                st.image(img, width=120)
-                st.markdown(f"<p style='text-align:center; color:green; font-weight:bold'>{name}</p>",
-                            unsafe_allow_html=True)
-    
-    # קו הפרדה בולט
-    st.markdown("---")
-    st.markdown("<hr style='border: 3px solid #ccc; margin: 20px 0'>",
-                unsafe_allow_html=True)
+    # נוכחים וחסרים זה לצד זה
+    col1, col2 = st.columns(2)
 
-    # ❌ חסרים
-    st.header(f"❌ חסרים ({len(missing_students)})")
-    if missing_students:
-        cols = st.columns(5)
-        for i, name in enumerate(missing_students):
-            with cols[i % 5]:
-                if name in reference_photos:
-                    st.image(reference_photos[name], width=120)
-                st.markdown(f"<p style='text-align:center; color:red; font-weight:bold'>{name}</p>",
-                            unsafe_allow_html=True)
-    else:
-        st.success("כולם נוכחים! 🎉")
+    with col1:
+        st.header(f"✅ נוכחים ({len(present_students)})")
+        st.markdown("<hr style='border: 2px solid #00cc00'>", unsafe_allow_html=True)
+        if present_students:
+            cols = st.columns(3)
+            for i, (name, img) in enumerate(present_students.items()):
+                with cols[i % 3]:
+                    st.image(img, width=110)
+                    st.markdown(
+                        f"<p style='text-align:center; color:#00cc00; font-weight:bold; font-size:15px'>{name}</p>",
+                        unsafe_allow_html=True
+                    )
+
+    with col2:
+        st.header(f"❌ חסרים ({len(missing_students)})")
+        st.markdown("<hr style='border: 2px solid #ff4444'>", unsafe_allow_html=True)
+        if missing_students:
+            cols = st.columns(3)
+            for i, name in enumerate(missing_students):
+                with cols[i % 3]:
+                    if name in reference_photos:
+                        st.image(reference_photos[name], width=110)
+                    st.markdown(
+                        f"<p style='text-align:center; color:#ff4444; font-weight:bold; font-size:15px'>{name}</p>",
+                        unsafe_allow_html=True
+                    )
+        else:
+            st.success("כולם נוכחים! 🎉")
 
 # -------------------------
 # Sidebar
@@ -270,12 +274,4 @@ if mode == "📤 העלאת תמונה":
 
 elif mode == "🎲 הגרלת תמונה רנדומלית":
     if st.button("צור תמונת כיתה רנדומלית"):
-        bg_img, present = generate_class_image()
-        bg_rgb = cv2.cvtColor(bg_img, cv2.COLOR_BGR2RGB)
-        pil_image = Image.fromarray(bg_rgb)
-        st.subheader("התמונה הרנדומלית שנוצרה")
-        st.image(pil_image, use_column_width=True)
-        st.write("נוכחים אמיתיים:", present)
-        st.divider()
-        st.subheader("תוצאות הזיהוי האוטומטי")
-        recognize_faces(pil_image, confidence, threshold)
+        bg_img, pre
