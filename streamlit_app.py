@@ -177,23 +177,32 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             present_students[best_name] = img
             recognized_faces.append({"name": best_name, "box": box, "dist": best_dist})
 
-    # ציור תיבות – הכל בתוך הפונקציה
+    # ציור תיבות
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
 
-    try:
-        font_name = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)
-        font_conf = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
-    except:
-        font_name = ImageFont.load_default()
-        font_conf = ImageFont.load_default()
+    font_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+    ]
+    font_name = None
+    font_conf = None
+    for path in font_paths:
+        if os.path.exists(path):
+            font_name = ImageFont.truetype(path, 52)
+            font_conf = ImageFont.truetype(path, 32)
+            break
+    if font_name is None:
+        font_name = ImageFont.load_default(size=52)
+        font_conf = ImageFont.load_default(size=32)
 
     for face in recognized_faces:
         x, y, w, h = face["box"]
         confidence_pct = int((1 - face["dist"]) * 100)
         draw.rectangle([x, y, x+w, y+h], outline=(0,255,0), width=3)
-        draw.text((x, y-50), face["name"], fill=(0,255,0), font=font_name)
-        draw.text((x, y-22), f"{confidence_pct}%", fill=(255,255,0), font=font_conf)
+        draw.text((x, y-60), face["name"], fill=(0,255,0), font=font_name)
+        draw.text((x, y-28), f"{confidence_pct}%", fill=(255,255,0), font=font_conf)
 
     st.subheader("תוצאת זיהוי")
     st.image(img_draw, use_column_width=True)
@@ -201,27 +210,34 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     missing_students = [s for s in STUDENT_ROSTER if s not in present_students]
 
     st.divider()
-    col1, col2 = st.columns(2)
 
-    with col1:
-        st.header(f"✅ נוכחים ({len(present_students)})")
-        cols = st.columns(3)
+    # ✅ נוכחים
+    st.header(f"✅ נוכחים ({len(present_students)})")
+    if present_students:
+        cols = st.columns(5)
         for i, (name, img) in enumerate(present_students.items()):
-            with cols[i % 3]:
-                st.write(f"**{name}**")
-                st.image(img, width=90)
+            with cols[i % 5]:
+                st.image(img, width=120)
+                st.markdown(f"<p style='text-align:center; color:green; font-weight:bold'>{name}</p>",
+                            unsafe_allow_html=True)
+    
+    # קו הפרדה בולט
+    st.markdown("---")
+    st.markdown("<hr style='border: 3px solid #ccc; margin: 20px 0'>",
+                unsafe_allow_html=True)
 
-    with col2:
-        st.header(f"❌ חסרים ({len(missing_students)})")
-        if missing_students:
-            cols = st.columns(3)
-            for i, name in enumerate(missing_students):
-                with cols[i % 3]:
-                    st.write(f"**{name}**")
-                    if name in reference_photos:
-                        st.image(reference_photos[name], width=90)
-        else:
-            st.success("כולם נוכחים")
+    # ❌ חסרים
+    st.header(f"❌ חסרים ({len(missing_students)})")
+    if missing_students:
+        cols = st.columns(5)
+        for i, name in enumerate(missing_students):
+            with cols[i % 5]:
+                if name in reference_photos:
+                    st.image(reference_photos[name], width=120)
+                st.markdown(f"<p style='text-align:center; color:red; font-weight:bold'>{name}</p>",
+                            unsafe_allow_html=True)
+    else:
+        st.success("כולם נוכחים! 🎉")
 
 # -------------------------
 # Sidebar
