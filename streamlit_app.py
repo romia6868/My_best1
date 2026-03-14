@@ -90,7 +90,6 @@ def generate_class_image():
     positions = [(c * cell_w, r * cell_h) for r in range(rows) for c in range(cols)]
     random.shuffle(positions)
 
-    # המרת הרקע ל-PIL RGBA פעם אחת
     bg_pil = Image.fromarray(cv2.cvtColor(bg, cv2.COLOR_BGR2RGB)).convert("RGBA")
 
     i = 0
@@ -104,17 +103,14 @@ def generate_class_image():
                 if face is not None:
                     new_w = int(cell_w * 0.8)
                     new_h = int(cell_h * 0.8)
-                    # הסרת רקע
                     face_pil = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
                     face_no_bg = remove(face_pil).resize((new_w, new_h))
-                    # הדבקה עם שקיפות
                     x, y = positions[i]
                     x = x + (cell_w - new_w) // 2
                     y = y + (cell_h - new_h) // 2
                     bg_pil.paste(face_no_bg, (x, y), face_no_bg)
                     i += 1
 
-    # המרה חזרה ל-RGB
     result_img = bg_pil.convert("RGB")
     return np.array(result_img), present
 
@@ -188,7 +184,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             present_students[best_name] = img
             recognized_faces.append({"name": best_name, "box": box, "dist": best_dist})
 
-    # ציור תיבות על התמונה המקורית (לא שכפול)
+    # ציור תיבות
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
 
@@ -268,7 +264,11 @@ with st.sidebar:
 # בחירת מצב
 # -------------------------
 st.subheader("בחרי מצב")
-mode = st.radio("", ["📤 העלאת תמונה", "🎲 הגרלת תמונה רנדומלית"], horizontal=True)
+mode = st.radio(
+    "",
+    ["📤 העלאת תמונה", "🎲 הגרלת תמונה רנדומלית", "📷 צילום מהמצלמה"],
+    horizontal=True
+)
 
 if mode == "📤 העלאת תמונה":
     class_file = st.file_uploader("Upload class photo", type=["jpg","jpeg","png"])
@@ -293,3 +293,13 @@ elif mode == "🎲 הגרלת תמונה רנדומלית":
         st.divider()
         st.subheader("תוצאות הזיהוי האוטומטי")
         recognize_faces(pil_image, confidence, threshold)
+
+elif mode == "📷 צילום מהמצלמה":
+    st.info("צלמי את תמונת הכיתה ואז לחצי על 'בדוק נוכחות'")
+    camera_photo = st.camera_input("צלמי תמונת כיתה")
+    if camera_photo is not None:
+        class_image = Image.open(camera_photo)
+        if max(class_image.size) > 1200:
+            class_image.thumbnail((1200, 1200))
+        if st.button("בדוק נוכחות"):
+            recognize_faces(class_image, confidence, threshold)
