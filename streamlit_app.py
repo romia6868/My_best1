@@ -1,6 +1,6 @@
 import streamlit as st
 from deepface import DeepFace
-from PIL import Image, ImageOps, ImageDraw
+from PIL import Image, ImageOps, ImageDraw, ImageFont
 import numpy as np
 import os
 import zipfile
@@ -18,12 +18,8 @@ if not os.path.exists(EXTRACT_PATH):
         zip_ref.extractall(EXTRACT_PATH)
 
 REFERENCE_DIR = os.path.join(EXTRACT_PATH, "content", "My_Classmates_small")
-BACKGROUND = os.path.join(BASE_DIR, "הורדה.jfif")
 STUDENT_ROSTER = ['Maayan','Tomer','Roei','Zohar','Ilay']
 
-# -------------------------
-# טעינת embeddings
-# -------------------------
 @st.cache_resource
 def load_reference_embeddings():
     embeddings = {}
@@ -50,12 +46,6 @@ def load_reference_embeddings():
                 embeddings[student] = student_embeddings
     return embeddings
 
-reference_embeddings = load_reference_embeddings()
-st.info(f"נמצאו {len(reference_embeddings)} תלמידים במאגר")
-
-# -------------------------
-# טעינת תמונה אחת מהדאטה לכל תלמיד
-# -------------------------
 @st.cache_resource
 def load_reference_photos():
     photos = {}
@@ -69,11 +59,10 @@ def load_reference_photos():
                 photos[student] = Image.open(img_path).convert("RGB")
     return photos
 
+reference_embeddings = load_reference_embeddings()
 reference_photos = load_reference_photos()
+st.info(f"נמצאו {len(reference_embeddings)} תלמידים במאגר")
 
-# -------------------------
-# יצירת תמונה רנדומלית
-# -------------------------
 def generate_class_image():
     background_options = [
         os.path.join(BASE_DIR, "הורדה.jfif"),
@@ -118,9 +107,6 @@ def generate_class_image():
                     i += 1
     return bg, present
 
-# -------------------------
-# חיתוך פנים
-# -------------------------
 def extract_faces(image, confidence_threshold=0.7):
     img_rgb = np.array(image.convert("RGB"))
     faces = []
@@ -136,7 +122,6 @@ def extract_faces(image, confidence_threshold=0.7):
                 continue
             region = face_obj["facial_area"]
             x, y, w, h = region["x"], region["y"], region["w"], region["h"]
-            # padding
             pad_x = int(0.2 * w)
             pad_y = int(0.2 * h)
             x1 = max(0, x - pad_x)
@@ -151,20 +136,15 @@ def extract_faces(image, confidence_threshold=0.7):
     except Exception as e:
         st.warning(f"שגיאה בזיהוי פנים: {e}")
     return faces, img_rgb
-# -------------------------
-# cosine distance
-# -------------------------
+
 def cosine_distance(a, b):
     return 1 - np.dot(a, b)
 
-# -------------------------
-# זיהוי פנים
-# -------------------------
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     faces, original_img_rgb = extract_faces(image_pil, confidence_threshold)
     st.write(f"זוהו {len(faces)} פנים")
 
-    present_students = {}  # name → תמונה מהתמונה הכיתתית
+    present_students = {}
     recognized_faces = []
 
     for i, data in enumerate(faces):
@@ -194,27 +174,26 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             best_name = None
 
         if best_name and best_name not in present_students:
-            present_students[best_name] = img  # ← תמונה מהתמונה הכיתתית
+            present_students[best_name] = img
             recognized_faces.append({"name": best_name, "box": box, "dist": best_dist})
-    # ציור תיבות
-    from PIL import ImageFont
 
-img_draw = Image.fromarray(original_img_rgb)
-draw = ImageDraw.Draw(img_draw)
+    # ציור תיבות – הכל בתוך הפונקציה
+    img_draw = Image.fromarray(original_img_rgb)
+    draw = ImageDraw.Draw(img_draw)
 
-try:
-    font_name = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)
-    font_conf = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
-except:
-    font_name = ImageFont.load_default()
-    font_conf = ImageFont.load_default()
+    try:
+        font_name = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)
+        font_conf = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
+    except:
+        font_name = ImageFont.load_default()
+        font_conf = ImageFont.load_default()
 
-for face in recognized_faces:
-    x, y, w, h = face["box"]
-    confidence_pct = int((1 - face["dist"]) * 100)
-    draw.rectangle([x, y, x+w, y+h], outline=(0,255,0), width=3)
-    draw.text((x, y-50), face["name"], fill=(0,255,0), font=font_name)
-    draw.text((x, y-22), f"{confidence_pct}%", fill=(255,255,0), font=font_conf)
+    for face in recognized_faces:
+        x, y, w, h = face["box"]
+        confidence_pct = int((1 - face["dist"]) * 100)
+        draw.rectangle([x, y, x+w, y+h], outline=(0,255,0), width=3)
+        draw.text((x, y-50), face["name"], fill=(0,255,0), font=font_name)
+        draw.text((x, y-22), f"{confidence_pct}%", fill=(255,255,0), font=font_conf)
 
     st.subheader("תוצאת זיהוי")
     st.image(img_draw, use_column_width=True)
@@ -230,7 +209,7 @@ for face in recognized_faces:
         for i, (name, img) in enumerate(present_students.items()):
             with cols[i % 3]:
                 st.write(f"**{name}**")
-                st.image(img, width=90)  # ← תמונה מהתמונה הכיתתית
+                st.image(img, width=90)
 
     with col2:
         st.header(f"❌ חסרים ({len(missing_students)})")
@@ -240,7 +219,7 @@ for face in recognized_faces:
                 with cols[i % 3]:
                     st.write(f"**{name}**")
                     if name in reference_photos:
-                        st.image(reference_photos[name], width=90)  # ← תמונה מהדאטה
+                        st.image(reference_photos[name], width=90)
         else:
             st.success("כולם נוכחים")
 
