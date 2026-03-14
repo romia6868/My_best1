@@ -198,12 +198,24 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             recognized_faces.append({"name": best_name, "box": box})
 
     # ציור תיבות
-    img_draw = Image.fromarray(original_img_rgb)
-    draw = ImageDraw.Draw(img_draw)
-    for face in recognized_faces:
-        x, y, w, h = face["box"]
-        draw.rectangle([x, y, x+w, y+h], outline=(0,255,0), width=3)
-        draw.text((x, y-20), face["name"], fill=(0,255,0))
+    from PIL import ImageFont
+
+img_draw = Image.fromarray(original_img_rgb)
+draw = ImageDraw.Draw(img_draw)
+
+try:
+    font_name = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)
+    font_conf = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
+except:
+    font_name = ImageFont.load_default()
+    font_conf = ImageFont.load_default()
+
+for face in recognized_faces:
+    x, y, w, h = face["box"]
+    confidence_pct = int((1 - face["dist"]) * 100)
+    draw.rectangle([x, y, x+w, y+h], outline=(0,255,0), width=3)
+    draw.text((x, y-50), face["name"], fill=(0,255,0), font=font_name)
+    draw.text((x, y-22), f"{confidence_pct}%", fill=(255,255,0), font=font_conf)
 
     st.subheader("תוצאת זיהוי")
     st.image(img_draw, use_column_width=True)
