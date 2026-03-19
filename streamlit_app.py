@@ -8,11 +8,19 @@ import random
 import cv2
 from rembg import remove
 
+st.set_page_config(
+    page_title="Smart Attendance",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap');
 
 * { font-family: 'Space Grotesk', sans-serif !important; }
+.emoji { font-family: 'Noto Color Emoji', sans-serif !important; }
 
 .stApp {
     background: linear-gradient(135deg, #fdf6f0 0%, #fef9f5 50%, #fdf4ea 100%) !important;
@@ -25,16 +33,17 @@ st.markdown("""
     margin-bottom: 1.5rem;
 }
 .header-icon {
-    width: 46px; height: 46px;
+    width: 52px; height: 52px;
     background: linear-gradient(135deg, #c99566, #b5784a);
-    border-radius: 12px;
+    border-radius: 14px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 22px;
+    font-size: 26px; font-family: 'Noto Color Emoji', sans-serif !important;
 }
 .header-title {
-    font-size: 26px; font-weight: 700;
+    font-size: 28px; font-weight: 700;
     background: linear-gradient(90deg, #b5784a, #c99566, #d4a853);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin: 0;
 }
 
 .stat-row { display: flex; gap: 12px; margin: 1.5rem 0; }
@@ -43,21 +52,23 @@ st.markdown("""
     border: 1px solid #c9956625;
     border-radius: 12px; padding: 16px 18px;
 }
-.stat-label { font-size: 12px; color: #b09080; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-label { font-size: 11px; color: #b09080; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
 .stat-val { font-size: 28px; font-weight: 700; }
 .stat-sub { font-size: 11px; color: #c0a898; margin-top: 3px; }
 .stat-green { color: #7a9e6a; }
 .stat-red { color: #c4605a; }
-.stat-white { background: linear-gradient(90deg, #b5784a, #d4a853); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.stat-gold { background: linear-gradient(90deg, #b5784a, #d4a853); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 
 .stRadio > div { flex-direction: row !important; gap: 8px; }
 .stRadio label {
     background: #fff !important;
     border: 1px solid #c9956630 !important;
-    border-radius: 8px !important;
-    padding: 8px 16px !important;
+    border-radius: 10px !important;
+    padding: 10px 18px !important;
     color: #a07858 !important;
     font-size: 14px !important;
+    font-weight: 500 !important;
+    transition: all 0.2s !important;
 }
 .stRadio label:has(input:checked) {
     background: linear-gradient(135deg, #c99566, #b5784a) !important;
@@ -74,6 +85,8 @@ st.markdown("""
     font-size: 15px !important;
     font-weight: 600 !important;
     width: 100% !important;
+    letter-spacing: 0.3px !important;
+    transition: all 0.2s !important;
 }
 .stButton > button:hover {
     filter: brightness(1.08) !important;
@@ -86,7 +99,7 @@ st.markdown("""
     text-align: center; background: #c9956610;
     margin-bottom: 1rem;
 }
-.upload-icon { font-size: 36px; margin-bottom: 10px; }
+.upload-icon { font-size: 36px; margin-bottom: 10px; font-family: 'Noto Color Emoji', sans-serif !important; }
 .upload-text { font-size: 15px; color: #8a5a3a; margin-bottom: 4px; font-weight: 500; }
 .upload-sub { font-size: 12px; color: #b09080; }
 
@@ -96,8 +109,9 @@ st.markdown("""
 }
 .divider-line { flex: 1; height: 1px; background: #c9956625; }
 .divider-badge {
-    font-size: 12px; padding: 3px 12px;
+    font-size: 12px; padding: 4px 14px;
     border-radius: 20px; font-weight: 600;
+    display: flex; align-items: center; gap: 5px;
 }
 .badge-present { background: #7a9e6a20; color: #7a9e6a; }
 .badge-absent { background: #c4605a20; color: #c4605a; }
@@ -106,7 +120,11 @@ st.markdown("""
     background: #fef5ee !important;
     border-right: 1px solid #c9956620 !important;
 }
-.sidebar-title { font-size: 16px; font-weight: 700; color: #5a3a2a; margin-bottom: 1rem; }
+.sidebar-title {
+    font-size: 15px; font-weight: 700;
+    color: #5a3a2a; margin-bottom: 1rem;
+    display: flex; align-items: center; gap: 6px;
+}
 .sidebar-student {
     display: flex; align-items: center; gap: 8px;
     padding: 8px 10px; background: #fff;
@@ -114,7 +132,11 @@ st.markdown("""
     font-size: 13px; color: #7a5a4a;
     border: 1px solid #c9956618;
 }
-.student-dot { width: 8px; height: 8px; border-radius: 50%; background: linear-gradient(135deg, #c99566, #d4a853); }
+.student-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: linear-gradient(135deg, #c99566, #d4a853);
+    flex-shrink: 0;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -148,7 +170,7 @@ def load_reference_embeddings():
                         emb = np.array(result[0]["embedding"])
                         emb = emb / np.linalg.norm(emb)
                         student_embeddings.append(emb)
-                    except Exception as e:
+                    except:
                         pass
             if student_embeddings:
                 embeddings[student] = student_embeddings
@@ -171,32 +193,31 @@ reference_embeddings = load_reference_embeddings()
 reference_photos = load_reference_photos()
 
 # -------------------------
-# כותרת
+# Header
 # -------------------------
 st.markdown("""
 <div class="main-header">
     <div class="header-icon">📸</div>
     <div>
-        <div class="header-title">מערכת נוכחות חכמה</div>
-        <div class="header-sub">זיהוי פנים אוטומטי · Facenet512 · RetinaFace</div>
+        <div class="header-title">Smart Attendance</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
 # -------------------------
-# סיידבר
+# Sidebar
 # -------------------------
 with st.sidebar:
-    st.markdown('<div class="sidebar-title">⚙️ הגדרות</div>', unsafe_allow_html=True)
-    threshold = st.slider("רמת זיהוי", 0.0, 1.0, 0.4, help="ככל שנמוך יותר – קפדני יותר")
-    confidence = st.slider("רגישות זיהוי פנים", 0.5, 1.0, 0.7)
+    st.markdown('<div class="sidebar-title"><span class="emoji">⚙️</span> Settings</div>', unsafe_allow_html=True)
+    threshold = st.slider("Detection threshold", 0.0, 1.0, 0.4)
+    confidence = st.slider("Face confidence", 0.5, 1.0, 0.7)
     st.markdown("---")
-    st.markdown('<div class="sidebar-title">👥 רשימת כיתה</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-title"><span class="emoji">👥</span> Class roster</div>', unsafe_allow_html=True)
     for s in STUDENT_ROSTER:
         st.markdown(f'<div class="sidebar-student"><div class="student-dot"></div>{s}</div>', unsafe_allow_html=True)
 
 # -------------------------
-# פונקציות
+# Functions
 # -------------------------
 def generate_class_image():
     background_options = [
@@ -207,12 +228,12 @@ def generate_class_image():
     ]
     available_backgrounds = [b for b in background_options if os.path.exists(b)]
     if not available_backgrounds:
-        st.error("לא נמצאו תמונות רקע")
+        st.error("No background images found")
         st.stop()
     chosen_bg = random.choice(available_backgrounds)
     bg = cv2.imread(chosen_bg)
     if bg is None:
-        st.error(f"לא ניתן לטעון את הרקע")
+        st.error("Could not load background")
         st.stop()
     bg = cv2.resize(bg, (900, 600), interpolation=cv2.INTER_CUBIC)
     students = os.listdir(REFERENCE_DIR)
@@ -271,17 +292,17 @@ def extract_faces(image, confidence_threshold=0.7):
             face_img = Image.fromarray(face).resize((160, 160))
             faces.append({"face": face_img, "box": (x1, y1, x2-x1, y2-y1)})
     except Exception as e:
-        st.warning(f"שגיאה בזיהוי פנים: {e}")
+        st.warning(f"Face detection error: {e}")
     return faces, img_rgb
 
 def cosine_distance(a, b):
     return 1 - np.dot(a, b)
 
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
-    with st.spinner("מנתח פנים..."):
+    with st.spinner("Scanning faces..."):
         faces, original_img_rgb = extract_faces(image_pil, confidence_threshold)
 
-    st.markdown(f'<p style="color:#888; font-size:13px; margin-bottom:1rem;">זוהו {len(faces)} פנים בתמונה</p>', unsafe_allow_html=True)
+    st.markdown(f'<p style="color:#b09080; font-size:13px; margin-bottom:1rem;">{len(faces)} faces detected in photo</p>', unsafe_allow_html=True)
 
     present_students = {}
     recognized_faces = []
@@ -315,7 +336,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             present_students[best_name] = img
             recognized_faces.append({"name": best_name, "box": box, "dist": best_dist})
 
-    # ציור על תמונה
+    # Draw boxes
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
     font_paths = [
@@ -335,72 +356,77 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     for face in recognized_faces:
         x, y, w, h = face["box"]
         confidence_pct = int((1 - face["dist"]) * 100)
-        draw.rectangle([x, y, x+w, y+h], outline=(124,58,237), width=3)
-        draw.text((x, y-42), face["name"], fill=(124,58,237), font=font_name)
-        draw.text((x, y-20), f"{confidence_pct}%", fill=(56,189,248), font=font_conf)
+        draw.rectangle([x, y, x+w, y+h], outline=(201,149,102), width=3)
+        draw.text((x, y-42), face["name"], fill=(181,120,74), font=font_name)
+        draw.text((x, y-20), f"{confidence_pct}%", fill=(212,168,83), font=font_conf)
 
     st.image(img_draw, use_column_width=True)
 
-    # סטטיסטיקות
     missing_students = [s for s in STUDENT_ROSTER if s not in present_students]
     pct = int(len(present_students) / len(STUDENT_ROSTER) * 100)
 
     st.markdown(f"""
     <div class="stat-row">
         <div class="stat-card">
-            <div class="stat-label">נוכחים</div>
+            <div class="stat-label">Present</div>
             <div class="stat-val stat-green">{len(present_students)}</div>
-            <div class="stat-sub">מתוך {len(STUDENT_ROSTER)}</div>
+            <div class="stat-sub">out of {len(STUDENT_ROSTER)}</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">חסרים</div>
+            <div class="stat-label">Absent</div>
             <div class="stat-val stat-red">{len(missing_students)}</div>
-            <div class="stat-sub">יש לבדוק</div>
+            <div class="stat-sub">check required</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">אחוז נוכחות</div>
-            <div class="stat-val stat-white">{pct}%</div>
-            <div class="stat-sub">היום</div>
+            <div class="stat-label">Attendance</div>
+            <div class="stat-val stat-gold">{pct}%</div>
+            <div class="stat-sub">today</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # נוכחים
-    st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present">✅ נוכחים</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
-
+    # Present
+    st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="emoji">✅</span> Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
     if present_students:
         cols = st.columns(5)
         for i, (name, img) in enumerate(present_students.items()):
             with cols[i % 5]:
                 st.image(img, width=100)
-                st.markdown(f'<div class="student-name" style="text-align:center;color:#10B981;font-weight:600;font-size:13px;">{name}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;font-family:Space Grotesk,sans-serif;">{name}</div>', unsafe_allow_html=True)
 
-    # חסרים
-    st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-absent">❌ חסרים</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
-
+    # Absent
+    st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-absent"><span class="emoji">❌</span> Absent</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
     if missing_students:
         cols = st.columns(5)
         for i, name in enumerate(missing_students):
             with cols[i % 5]:
                 if name in reference_photos:
                     st.image(reference_photos[name], width=100)
-                st.markdown(f'<div style="text-align:center;color:#F43F5E;font-weight:600;font-size:13px;">{name}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="text-align:center;color:#c4605a;font-weight:600;font-size:13px;font-family:Space Grotesk,sans-serif;">{name}</div>', unsafe_allow_html=True)
     else:
-        st.success("כולם נוכחים היום! 🎉")
+        st.success("Everyone's here today!")
 
 # -------------------------
-# בחירת מצב
+# Mode selection
 # -------------------------
-mode = st.radio("", ["📤 העלאת תמונה", "🎲 הגרלה רנדומלית", "📷 צילום מצלמה"], horizontal=True)
+mode = st.radio(
+    "",
+    [
+        "📤  Upload Photo",
+        "🎲  Random Class",
+        "📷  Live Camera"
+    ],
+    horizontal=True
+)
 
-st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
+st.markdown("<div style='margin-bottom:1rem;'></div>", unsafe_allow_html=True)
 
-if mode == "📤 העלאת תמונה":
-    st.markdown('<div class="upload-zone"><div class="upload-icon">🖼️</div><div class="upload-text">גרור תמונת כיתה לכאן</div><div class="upload-sub">JPG · PNG · JPEG</div></div>', unsafe_allow_html=True)
+if mode == "📤  Upload Photo":
+    st.markdown('<div class="upload-zone"><div class="upload-icon">🖼️</div><div class="upload-text">Drop your class photo here</div><div class="upload-sub">JPG · PNG · JPEG</div></div>', unsafe_allow_html=True)
     class_file = st.file_uploader("", type=["jpg","jpeg","png"], label_visibility="collapsed")
-    if st.button("🔍 בדוק נוכחות"):
+    if st.button("🔍  Scan for Attendance"):
         if class_file is None:
-            st.warning("יש להעלות תמונה תחילה")
+            st.warning("Please upload a photo first")
             st.stop()
         class_image = Image.open(class_file)
         class_image = ImageOps.exif_transpose(class_image)
@@ -408,23 +434,24 @@ if mode == "📤 העלאת תמונה":
             class_image.thumbnail((1200, 1200))
         recognize_faces(class_image, confidence, threshold)
 
-elif mode == "🎲 הגרלה רנדומלית":
-    st.markdown('<p style="color:#888; font-size:14px;">יצירת תמונת כיתה רנדומלית עם תלמידים אקראיים</p>', unsafe_allow_html=True)
-    if st.button("🎲 צור תמונת כיתה"):
-        with st.spinner("מייצר תמונת כיתה..."):
+elif mode == "🎲  Random Class":
+    st.markdown('<p style="color:#b09080;font-size:14px;">Generate a random class photo with students placed on a classroom background.</p>', unsafe_allow_html=True)
+    if st.button("🎲  Generate Class Photo"):
+        with st.spinner("Generating class photo..."):
             result_img, present = generate_class_image()
         pil_image = Image.fromarray(result_img)
         st.image(pil_image, use_column_width=True)
-        st.markdown(f'<p style="color:#888; font-size:13px; margin: 8px 0;">נוכחים אמיתיים: <span style="color:#7C3AED; font-weight:600;">{", ".join(present) if present else "אף אחד"}</span></p>', unsafe_allow_html=True)
+        present_str = ", ".join(present) if present else "Nobody"
+        st.markdown(f'<p style="color:#b09080;font-size:13px;margin:8px 0;">Actually present: <span style="color:#c99566;font-weight:600;">{present_str}</span></p>', unsafe_allow_html=True)
         st.markdown("---")
         recognize_faces(pil_image, confidence, threshold)
 
-elif mode == "📷 צילום מצלמה":
-    st.markdown('<p style="color:#888; font-size:14px;">צלמי את תמונת הכיתה ישירות מהמצלמה</p>', unsafe_allow_html=True)
+elif mode == "📷  Live Camera":
+    st.markdown('<p style="color:#b09080;font-size:14px;">Take a photo directly from your camera.</p>', unsafe_allow_html=True)
     camera_photo = st.camera_input("")
     if camera_photo is not None:
         class_image = Image.open(camera_photo)
         if max(class_image.size) > 1200:
             class_image.thumbnail((1200, 1200))
-        if st.button("🔍 בדוק נוכחות"):
+        if st.button("🔍  Scan for Attendance"):
             recognize_faces(class_image, confidence, threshold)
