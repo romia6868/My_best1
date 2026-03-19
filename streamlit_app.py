@@ -8,161 +8,113 @@ import random
 import cv2
 from rembg import remove
 
-st.set_page_config(
-    page_title="מערכת נוכחות חכמה",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# -------------------------
-# CSS מותאם אישית
-# -------------------------
 st.markdown("""
 <style>
-    /* רקע כללי */
-    .stApp { background: #0f1117; }
-    
-    /* כותרת ראשית */
-    .main-header {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        padding: 1.5rem 0 1rem;
-        border-bottom: 1px solid #ffffff15;
-        margin-bottom: 1.5rem;
-    }
-    .header-icon {
-        width: 46px; height: 46px;
-        background: #7C3AED;
-        border-radius: 12px;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 22px;
-    }
-    .header-title { font-size: 26px; font-weight: 700; color: white; margin: 0; }
-    .header-sub { font-size: 13px; color: #888; margin: 2px 0 0; }
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
-    /* כרטיסי סטטיסטיקה */
-    .stat-row { display: flex; gap: 12px; margin: 1.5rem 0; }
-    .stat-card {
-        flex: 1;
-        background: #1a1d27;
-        border: 1px solid #ffffff10;
-        border-radius: 12px;
-        padding: 16px 18px;
-    }
-    .stat-label { font-size: 12px; color: #888; margin-bottom: 6px; }
-    .stat-val { font-size: 28px; font-weight: 700; }
-    .stat-sub { font-size: 11px; color: #555; margin-top: 3px; }
-    .stat-green { color: #10B981; }
-    .stat-red { color: #F43F5E; }
-    .stat-white { color: #fff; }
+* { font-family: 'Space Grotesk', sans-serif !important; }
 
-    /* טאבים */
-    .stRadio > div { flex-direction: row !important; gap: 8px; }
-    .stRadio label {
-        background: #1a1d27 !important;
-        border: 1px solid #ffffff15 !important;
-        border-radius: 8px !important;
-        padding: 8px 16px !important;
-        color: #aaa !important;
-        font-size: 14px !important;
-    }
-    .stRadio label:has(input:checked) {
-        background: #7C3AED !important;
-        border-color: #7C3AED !important;
-        color: white !important;
-    }
+.stApp {
+    background: linear-gradient(135deg, #fdf6f0 0%, #fef9f5 50%, #fdf4ea 100%) !important;
+}
 
-    /* כפתור ראשי */
-    .stButton > button {
-        background: #7C3AED !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 10px !important;
-        padding: 12px 28px !important;
-        font-size: 15px !important;
-        font-weight: 600 !important;
-        width: 100% !important;
-        transition: all 0.2s !important;
-    }
-    .stButton > button:hover {
-        background: #6D28D9 !important;
-        transform: translateY(-1px) !important;
-    }
+.main-header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 1.5rem 0 1rem;
+    border-bottom: 1px solid #c9956630;
+    margin-bottom: 1.5rem;
+}
+.header-icon {
+    width: 46px; height: 46px;
+    background: linear-gradient(135deg, #c99566, #b5784a);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+}
+.header-title {
+    font-size: 26px; font-weight: 700;
+    background: linear-gradient(90deg, #b5784a, #c99566, #d4a853);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
 
-    /* אזור העלאה */
-    .upload-zone {
-        border: 2px dashed #7C3AED55;
-        border-radius: 14px;
-        padding: 2.5rem;
-        text-align: center;
-        background: #7C3AED08;
-        margin-bottom: 1rem;
-    }
-    .upload-icon { font-size: 36px; margin-bottom: 10px; }
-    .upload-text { font-size: 15px; color: #aaa; margin-bottom: 4px; }
-    .upload-sub { font-size: 12px; color: #555; }
+.stat-row { display: flex; gap: 12px; margin: 1.5rem 0; }
+.stat-card {
+    flex: 1; background: #fff;
+    border: 1px solid #c9956625;
+    border-radius: 12px; padding: 16px 18px;
+}
+.stat-label { font-size: 12px; color: #b09080; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-val { font-size: 28px; font-weight: 700; }
+.stat-sub { font-size: 11px; color: #c0a898; margin-top: 3px; }
+.stat-green { color: #7a9e6a; }
+.stat-red { color: #c4605a; }
+.stat-white { background: linear-gradient(90deg, #b5784a, #d4a853); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 
-    /* כרטיסי תלמידים */
-    .student-card {
-        background: #1a1d27;
-        border: 1px solid #ffffff10;
-        border-radius: 12px;
-        padding: 14px 10px;
-        text-align: center;
-        transition: transform 0.2s;
-    }
-    .student-card:hover { transform: translateY(-2px); }
-    .student-avatar {
-        width: 56px; height: 56px;
-        border-radius: 50%;
-        margin: 0 auto 8px;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 20px; font-weight: 700;
-    }
-    .avatar-present { background: #10B98120; color: #10B981; }
-    .avatar-absent { background: #F43F5E20; color: #F43F5E; }
-    .student-name { font-size: 13px; font-weight: 600; color: white; }
-    .student-pct { font-size: 11px; color: #38BDF8; margin-top: 3px; }
-    .student-absent-label { font-size: 11px; color: #F43F5E66; margin-top: 3px; }
+.stRadio > div { flex-direction: row !important; gap: 8px; }
+.stRadio label {
+    background: #fff !important;
+    border: 1px solid #c9956630 !important;
+    border-radius: 8px !important;
+    padding: 8px 16px !important;
+    color: #a07858 !important;
+    font-size: 14px !important;
+}
+.stRadio label:has(input:checked) {
+    background: linear-gradient(135deg, #c99566, #b5784a) !important;
+    border-color: transparent !important;
+    color: white !important;
+}
 
-    /* מפריד */
-    .section-divider {
-        display: flex; align-items: center; gap: 12px;
-        margin: 1.8rem 0 1.2rem;
-    }
-    .divider-line { flex: 1; height: 1px; background: #ffffff10; }
-    .divider-badge {
-        font-size: 12px; padding: 3px 12px;
-        border-radius: 20px; font-weight: 600;
-    }
-    .badge-present { background: #10B98120; color: #10B981; }
-    .badge-absent { background: #F43F5E20; color: #F43F5E; }
+.stButton > button {
+    background: linear-gradient(135deg, #c99566, #b5784a) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 12px 28px !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    width: 100% !important;
+}
+.stButton > button:hover {
+    filter: brightness(1.08) !important;
+    transform: translateY(-1px) !important;
+}
 
-    /* סיידבר */
-    .css-1d391kg, [data-testid="stSidebar"] {
-        background: #13151f !important;
-        border-right: 1px solid #ffffff10 !important;
-    }
-    .sidebar-title { font-size: 16px; font-weight: 700; color: white; margin-bottom: 1rem; }
-    .sidebar-student {
-        display: flex; align-items: center; gap: 8px;
-        padding: 8px 10px;
-        background: #1a1d27;
-        border-radius: 8px;
-        margin-bottom: 6px;
-        font-size: 13px; color: #ddd;
-    }
-    .student-dot { width: 8px; height: 8px; border-radius: 50%; background: #7C3AED; }
+.upload-zone {
+    border: 1.5px dashed #c9956650;
+    border-radius: 14px; padding: 2.5rem;
+    text-align: center; background: #c9956610;
+    margin-bottom: 1rem;
+}
+.upload-icon { font-size: 36px; margin-bottom: 10px; }
+.upload-text { font-size: 15px; color: #8a5a3a; margin-bottom: 4px; font-weight: 500; }
+.upload-sub { font-size: 12px; color: #b09080; }
 
-    /* spinner */
-    .stSpinner { color: #7C3AED !important; }
+.section-divider {
+    display: flex; align-items: center; gap: 12px;
+    margin: 1.8rem 0 1.2rem;
+}
+.divider-line { flex: 1; height: 1px; background: #c9956625; }
+.divider-badge {
+    font-size: 12px; padding: 3px 12px;
+    border-radius: 20px; font-weight: 600;
+}
+.badge-present { background: #7a9e6a20; color: #7a9e6a; }
+.badge-absent { background: #c4605a20; color: #c4605a; }
 
-    /* תמונת זיהוי */
-    .result-image { border-radius: 14px; overflow: hidden; border: 1px solid #ffffff15; }
-
-    /* info/success/warning */
-    .stAlert { border-radius: 10px !important; }
+[data-testid="stSidebar"] {
+    background: #fef5ee !important;
+    border-right: 1px solid #c9956620 !important;
+}
+.sidebar-title { font-size: 16px; font-weight: 700; color: #5a3a2a; margin-bottom: 1rem; }
+.sidebar-student {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; background: #fff;
+    border-radius: 8px; margin-bottom: 6px;
+    font-size: 13px; color: #7a5a4a;
+    border: 1px solid #c9956618;
+}
+.student-dot { width: 8px; height: 8px; border-radius: 50%; background: linear-gradient(135deg, #c99566, #d4a853); }
 </style>
 """, unsafe_allow_html=True)
 
