@@ -160,7 +160,7 @@ css = """
 .stSlider > div > div > div > div { background: #9585b0 !important; }
 .stSlider > div > div > div { background: #e4dff0 !important; }
 [data-testid="stSlider"] label { color: #4a3a6a !important; }
-[data-testid="stThumbValue"] { color: white !important; }
+[data-testid="stThumbValue"] { color: gray !important; }
 </style>
 """
 
