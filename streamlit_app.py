@@ -181,7 +181,7 @@ button_css = """
     box-shadow: 0 4px 12px #8c7b7520 !important;
 }
 .stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, #a09088, #8c7b75) !important;
+   background: #ffe5ec !important;
     color: white !important;
     border: none !important;
     box-shadow: 0 4px 14px #8c7b7530 !important;
@@ -210,7 +210,7 @@ button_css = """
     transform: translateY(-1px) !important;
 }
 [data-testid="stThumbValue"] {
-    color: white !important;
+    color: gray !important;
 }
 </style>
 """
