@@ -165,9 +165,60 @@ css = """
 </style>
 """
 
+button_css = """
+<style>
+.stButton > button {
+    background: #ebe8f2 !important;
+    color: #4a3a6a !important;
+    border: 1.5px solid #e4dff0 !important;
+    border-radius: 10px !important;
+    padding: 11px 16px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    width: 100% !important;
+    transition: all 0.2s !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+    margin-top: 0 !important;
+}
+.stButton > button:hover {
+    border-color: #9585b0 !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px #b8a9c930 !important;
+}
+.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #b8a9c9, #9585b0) !important;
+    color: white !important;
+    border: none !important;
+    box-shadow: 0 4px 14px #b8a9c940 !important;
+    padding: 13px 28px !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    margin-top: 12px !important;
+}
+.stButton > button[kind="primary"]:hover {
+    filter: brightness(1.08) !important;
+    transform: translateY(-2px) !important;
+}
+.stDownloadButton > button {
+    background: #ebe8f2 !important;
+    color: #9585b0 !important;
+    border: 1.5px solid #b8a9c9 !important;
+    border-radius: 10px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    width: 100% !important;
+    transition: all 0.2s !important;
+    margin-top: 8px !important;
+}
+.stDownloadButton > button:hover {
+    background: #e4dff0 !important;
+    transform: translateY(-1px) !important;
+}
+</style>
+"""
+
 st.markdown(css, unsafe_allow_html=True)
 st.markdown(button_css, unsafe_allow_html=True)
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ZIP_PATH = os.path.join(BASE_DIR, "My_Classmates_small.zip")
 EXTRACT_PATH = os.path.join(BASE_DIR, "My_Classmates")
