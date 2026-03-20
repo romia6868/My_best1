@@ -7,6 +7,7 @@ import zipfile
 import random
 import cv2
 from rembg import remove
+import json
 
 st.set_page_config(
     page_title="Smart Attendance",
@@ -14,17 +15,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# -------------------------
-# Session state
-# -------------------------
 if "mode" not in st.session_state:
     st.session_state.mode = "upload"
-if "scan_triggered" not in st.session_state:
-    st.session_state.scan_triggered = False
-if "generate_triggered" not in st.session_state:
-    st.session_state.generate_triggered = False
-if "uploaded_image" not in st.session_state:
-    st.session_state.uploaded_image = None
+if "collected_photos" not in st.session_state:
+    st.session_state.collected_photos = []
 
 st.markdown("""
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"/>
@@ -39,9 +33,33 @@ st.markdown("""
     -webkit-font-feature-settings: 'liga'; font-feature-settings: 'liga';
     -webkit-font-smoothing: antialiased;
 }
+
+/* ---- Animations ---- */
+@keyframes pulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 #c9956640; }
+    50% { transform: scale(1.06); box-shadow: 0 0 0 8px #c9956600; }
+}
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+    0% { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+}
+@keyframes ripple {
+    to { transform: scale(4); opacity: 0; }
+}
+@keyframes progressFill {
+    from { width: 0%; }
+}
+
+/* ---- App background ---- */
 .stApp {
     background: linear-gradient(135deg, #fdf6f0 0%, #fef9f5 50%, #fdf4ea 100%) !important;
 }
+
+/* ---- Header ---- */
 .main-header {
     display: flex; align-items: center; gap: 14px;
     padding: 1.5rem 0 1rem;
@@ -53,6 +71,7 @@ st.markdown("""
     background: linear-gradient(135deg, #c99566, #b5784a);
     border-radius: 14px;
     display: flex; align-items: center; justify-content: center;
+    animation: pulse 3s ease-in-out infinite;
 }
 .header-icon .material-symbols-outlined { font-size: 28px; color: white; }
 .header-title {
@@ -60,9 +79,9 @@ st.markdown("""
     background: linear-gradient(90deg, #b5784a, #c99566, #d4a853);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
-.mode-tabs {
-    display: flex; gap: 8px; margin-bottom: 1.5rem;
-}
+
+/* ---- Mode tabs ---- */
+.mode-tabs { display: flex; gap: 8px; margin-bottom: 1.5rem; }
 .mode-tab {
     flex: 1; padding: 11px 16px;
     border-radius: 10px;
@@ -74,13 +93,22 @@ st.markdown("""
     display: flex; align-items: center; justify-content: center; gap: 7px;
     font-family: 'Space Grotesk', sans-serif;
     transition: all 0.2s;
+    position: relative; overflow: hidden;
 }
+.mode-tab:hover {
+    border-color: #c99566;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px #c9956620;
+}
+.mode-tab:active { transform: translateY(1px); }
 .mode-tab .material-symbols-outlined { font-size: 18px; }
 .mode-tab.active {
     background: linear-gradient(135deg, #c99566, #b5784a);
     border-color: transparent; color: white;
 }
 .mode-tab.active .material-symbols-outlined { color: white; }
+
+/* ---- Action button ---- */
 .action-btn {
     width: 100%; padding: 13px;
     border-radius: 10px;
@@ -90,23 +118,64 @@ st.markdown("""
     display: flex; align-items: center; justify-content: center; gap: 8px;
     font-family: 'Space Grotesk', sans-serif;
     transition: all 0.2s; margin-top: 12px;
+    position: relative; overflow: hidden;
 }
-.action-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.action-btn:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 6px 18px #c9956640; }
+.action-btn:active { transform: translateY(1px); filter: brightness(0.95); }
 .action-btn .material-symbols-outlined { font-size: 20px; color: white; }
+
+/* Ripple */
+.ripple-btn {
+    position: relative; overflow: hidden;
+    padding: 10px 18px; border-radius: 10px;
+    background: #fff; border: 1px solid #c9956630;
+    color: #a07858; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: 'Space Grotesk', sans-serif;
+    transition: all 0.2s; display: inline-block;
+}
+.ripple-btn:hover { border-color: #c99566; color: #c99566; }
+.ripple {
+    position: absolute; border-radius: 50%;
+    background: #c9956640;
+    transform: scale(0);
+    animation: ripple 0.6s linear;
+    pointer-events: none;
+}
+
+/* ---- Upload zone ---- */
 .upload-zone {
     border: 1.5px dashed #c9956650;
     border-radius: 14px; padding: 2.5rem;
     text-align: center; background: #c9956610;
     margin-bottom: 1rem;
+    transition: all 0.2s;
 }
+.upload-zone:hover { border-color: #c99566; background: #c9956618; }
 .upload-zone .material-symbols-outlined { font-size: 44px; color: #c99566; }
 .upload-text { font-size: 15px; color: #8a5a3a; margin: 8px 0 4px; font-weight: 500; }
 .upload-sub { font-size: 12px; color: #b09080; }
+
+/* ---- Stat cards with shimmer ---- */
 .stat-row { display: flex; gap: 12px; margin: 1.5rem 0; }
 .stat-card {
     flex: 1; background: #fff;
     border: 1px solid #c9956625;
     border-radius: 12px; padding: 16px 18px;
+    transition: all 0.2s;
+    position: relative; overflow: hidden;
+}
+.stat-card::after {
+    content: '';
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, #c9956612, transparent);
+    background-size: 400px 100%;
+    animation: shimmer 2.5s infinite;
+}
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px #c9956618;
+    border-color: #c9956640;
 }
 .stat-label {
     font-size: 11px; color: #b09080;
@@ -120,6 +189,20 @@ st.markdown("""
 .stat-red { color: #c4605a; }
 .stat-gold { background: linear-gradient(90deg,#b5784a,#d4a853);
     -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+
+/* ---- Progress bar ---- */
+.progress-container {
+    background: #c9956615; border-radius: 8px;
+    height: 6px; margin: 8px 0 16px; overflow: hidden;
+}
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #c99566, #d4a853);
+    border-radius: 8px;
+    animation: progressFill 1.5s ease-out forwards;
+}
+
+/* ---- Section divider ---- */
 .section-divider {
     display: flex; align-items: center; gap: 12px;
     margin: 1.8rem 0 1.2rem;
@@ -133,6 +216,19 @@ st.markdown("""
 .divider-badge .material-symbols-outlined { font-size: 15px; }
 .badge-present { background: #7a9e6a20; color: #7a9e6a; }
 .badge-absent { background: #c4605a20; color: #c4605a; }
+
+/* ---- Student cards fade-in ---- */
+.student-card {
+    animation: fadeInUp 0.4s ease both;
+    text-align: center;
+}
+.student-card:nth-child(1) { animation-delay: 0.05s; }
+.student-card:nth-child(2) { animation-delay: 0.10s; }
+.student-card:nth-child(3) { animation-delay: 0.15s; }
+.student-card:nth-child(4) { animation-delay: 0.20s; }
+.student-card:nth-child(5) { animation-delay: 0.25s; }
+
+/* ---- Sidebar ---- */
 [data-testid="stSidebar"] {
     background: #fef5ee !important;
     border-right: 1px solid #c9956620 !important;
@@ -149,9 +245,19 @@ st.markdown("""
     border-radius: 8px; margin-bottom: 6px;
     font-size: 13px; color: #7a5a4a;
     border: 1px solid #c9956618;
+    transition: all 0.2s; cursor: default;
+    position: relative; overflow: hidden;
+}
+.sidebar-student:hover {
+    border-color: #c99566;
+    transform: translateX(4px);
+    box-shadow: 2px 0 8px #c9956620;
 }
 .sidebar-student .material-symbols-outlined { font-size: 16px; color: #c99566; }
 .mode-desc { color: #b09080; font-size: 14px; margin-bottom: 1rem; }
+
+/* Hide default streamlit buttons */
+.stButton { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -163,7 +269,22 @@ if not os.path.exists(EXTRACT_PATH):
         zip_ref.extractall(EXTRACT_PATH)
 
 REFERENCE_DIR = os.path.join(EXTRACT_PATH, "content", "My_Classmates_small")
-STUDENT_ROSTER = ['Maayan','Tomer','Roei','Zohar','Ilay']
+ROSTER_FILE = os.path.join(BASE_DIR, "student_roster.json")
+
+def load_roster():
+    if os.path.exists(ROSTER_FILE):
+        with open(ROSTER_FILE, "r") as f:
+            return json.load(f)
+    return ['Maayan','Tomer','Roei','Zohar','Ilay']
+
+def save_roster(roster):
+    with open(ROSTER_FILE, "w") as f:
+        json.dump(roster, f)
+
+if "student_roster" not in st.session_state:
+    st.session_state.student_roster = load_roster()
+
+STUDENT_ROSTER = st.session_state.student_roster
 
 @st.cache_resource
 def load_reference_embeddings():
@@ -207,9 +328,7 @@ def load_reference_photos():
 reference_embeddings = load_reference_embeddings()
 reference_photos = load_reference_photos()
 
-# -------------------------
-# Header
-# -------------------------
+# ---- Header ----
 st.markdown("""
 <div class="main-header">
     <div class="header-icon">
@@ -221,31 +340,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# -------------------------
-# Sidebar
-# -------------------------
-# -------------------------
-# שמירת רשימת תלמידים בקובץ
-# -------------------------
-ROSTER_FILE = os.path.join(BASE_DIR, "student_roster.json")
-
-def load_roster():
-    if os.path.exists(ROSTER_FILE):
-        import json
-        with open(ROSTER_FILE, "r") as f:
-            return json.load(f)
-    return ['Maayan','Tomer','Roei','Zohar','Ilay']
-
-def save_roster(roster):
-    import json
-    with open(ROSTER_FILE, "w") as f:
-        json.dump(roster, f)
-
-if "student_roster" not in st.session_state:
-    st.session_state.student_roster = load_roster()
-
-STUDENT_ROSTER = st.session_state.student_roster
-
+# ---- Sidebar ----
 with st.sidebar:
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">tune</span> Settings</div>', unsafe_allow_html=True)
     threshold = st.slider("Detection threshold", 0.0, 1.0, 0.4)
@@ -258,20 +353,19 @@ with st.sidebar:
     st.markdown("---")
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">manage_accounts</span> Manage Students</div>', unsafe_allow_html=True)
 
-    # הסרת תלמיד
     with st.expander("Remove student"):
-        student_to_remove = st.selectbox("Select student", STUDENT_ROSTER, key="remove_select")
-        if st.button("Remove", key="remove_btn"):
-            st.session_state.student_roster.remove(student_to_remove)
-            save_roster(st.session_state.student_roster)
-            student_path = os.path.join(REFERENCE_DIR, student_to_remove)
-            if os.path.exists(student_path):
-                import shutil
-                shutil.rmtree(student_path)
-            st.success(f"{student_to_remove} removed!")
-            st.rerun()
+        if STUDENT_ROSTER:
+            student_to_remove = st.selectbox("Select student", STUDENT_ROSTER, key="remove_select")
+            if st.button("Remove", key="remove_btn"):
+                st.session_state.student_roster.remove(student_to_remove)
+                save_roster(st.session_state.student_roster)
+                student_path = os.path.join(REFERENCE_DIR, student_to_remove)
+                if os.path.exists(student_path):
+                    import shutil
+                    shutil.rmtree(student_path)
+                st.success(f"{student_to_remove} removed!")
+                st.rerun()
 
-    # הוספת תלמיד
     with st.expander("Add new student"):
         new_name = st.text_input("Student name", placeholder="e.g. Noa", key="new_name")
         photo_method = st.radio("Photo method", ["📷 Camera", "📤 Upload"], key="photo_method", horizontal=True)
@@ -280,9 +374,10 @@ with st.sidebar:
             photos_collected = []
 
             if photo_method == "📷 Camera":
-                if "collected_photos" not in st.session_state:
-                    st.session_state.collected_photos = []
                 st.markdown(f'<p style="color:#b09080;font-size:12px;">Collected: <b style="color:#c99566;">{len(st.session_state.collected_photos)}/10</b></p>', unsafe_allow_html=True)
+                if len(st.session_state.collected_photos) > 0:
+                    pct = len(st.session_state.collected_photos) * 10
+                    st.markdown(f'<div class="progress-container"><div class="progress-bar" style="width:{pct}%"></div></div>', unsafe_allow_html=True)
                 cam_img = st.camera_input("", key=f"cam_{len(st.session_state.collected_photos)}")
                 col1, col2 = st.columns(2)
                 with col1:
@@ -293,20 +388,18 @@ with st.sidebar:
                     if st.button("Clear all", key="clear_photos"):
                         st.session_state.collected_photos = []
                         st.rerun()
-                if st.session_state.collected_photos:
-                    st.markdown(f'<p style="color:#7a9e6a;font-size:12px;">✓ {len(st.session_state.collected_photos)} photos ready</p>', unsafe_allow_html=True)
-                photos_collected = st.session_state.get("collected_photos", [])
-
+                photos_collected = st.session_state.collected_photos
             else:
                 uploaded_files = st.file_uploader("Upload photos", type=["jpg","jpeg","png"], accept_multiple_files=True, key="upload_photos")
                 if uploaded_files:
+                    pct = min(len(uploaded_files) * 10, 100)
+                    st.markdown(f'<div class="progress-container"><div class="progress-bar" style="width:{pct}%"></div></div>', unsafe_allow_html=True)
                     st.markdown(f'<p style="color:#{"7a9e6a" if len(uploaded_files)>=5 else "c99566"};font-size:12px;">{len(uploaded_files)}/10 photos</p>', unsafe_allow_html=True)
                 photos_collected = uploaded_files or []
 
             can_save = len(photos_collected) >= 5
-
             if st.button(
-                "Save student" if can_save else f"Need {max(0, 5-len(photos_collected))} more photos",
+                "Save student" if can_save else f"Need {max(0, 5-len(photos_collected))} more",
                 key="save_student",
                 disabled=not can_save
             ):
@@ -334,9 +427,8 @@ with st.sidebar:
                         reference_embeddings[new_name] = new_embeddings
                 st.success(f"✓ {new_name} added!")
                 st.rerun()
-# -------------------------
-# Mode tabs (HTML)
-# -------------------------
+
+# ---- Mode tabs ----
 st.markdown(f"""
 <div class="mode-tabs">
     <button class="mode-tab {'active' if st.session_state.mode == 'upload' else ''}"
@@ -354,16 +446,13 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Tab switching via query params
 params = st.query_params
 if "mode" in params:
     st.session_state.mode = params["mode"]
     st.query_params.clear()
     st.rerun()
 
-# -------------------------
-# Functions
-# -------------------------
+# ---- Functions ----
 def generate_class_image():
     background_options = [
         os.path.join(BASE_DIR, "הורדה.jfif"),
@@ -441,17 +530,18 @@ def cosine_distance(a, b):
     return 1 - np.dot(a, b)
 
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
-    with st.spinner("Scanning faces..."):
-        faces, original_img_rgb = extract_faces(image_pil, confidence_threshold)
-
-    st.markdown(f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;display:flex;align-items:center;gap:5px;"><span class="material-symbols-outlined" style="font-size:16px;color:#c99566;">center_focus_strong</span> {len(faces)} faces detected</p>', unsafe_allow_html=True)
+    progress = st.progress(0, text="Detecting faces...")
+    faces, original_img_rgb = extract_faces(image_pil, confidence_threshold)
+    progress.progress(30, text="Analyzing faces...")
 
     present_students = {}
     recognized_faces = []
+    total = max(len(faces), 1)
 
     for i, data in enumerate(faces):
         img = data["face"]
         box = data["box"]
+        progress.progress(30 + int(60 * i / total), text=f"Identifying face {i+1} of {len(faces)}...")
         try:
             result = DeepFace.represent(
                 img_path=np.array(img),
@@ -476,7 +566,12 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             present_students[best_name] = img
             recognized_faces.append({"name": best_name, "box": box, "dist": best_dist})
 
-    # Draw
+    progress.progress(100, text="Done!")
+    progress.empty()
+
+    st.markdown(f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;display:flex;align-items:center;gap:5px;"><span class="material-symbols-outlined" style="font-size:16px;color:#c99566;">center_focus_strong</span> {len(faces)} faces detected</p>', unsafe_allow_html=True)
+
+    # Draw boxes
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
     font_name = font_conf = None
@@ -500,7 +595,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     st.image(img_draw, use_column_width=True)
 
     missing = [s for s in STUDENT_ROSTER if s not in present_students]
-    pct = int(len(present_students) / len(STUDENT_ROSTER) * 100)
+    attendance_pct = int(len(present_students) / max(len(STUDENT_ROSTER), 1) * 100)
 
     st.markdown(f"""
     <div class="stat-row">
@@ -516,34 +611,39 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         </div>
         <div class="stat-card">
             <div class="stat-label"><span class="material-symbols-outlined" style="color:#d4a853;">insights</span>Attendance</div>
-            <div class="stat-val stat-gold">{pct}%</div>
+            <div class="stat-val stat-gold">{attendance_pct}%</div>
             <div class="stat-sub">today</div>
         </div>
     </div>
+    <div class="progress-container">
+        <div class="progress-bar" style="width:{attendance_pct}%"></div>
+    </div>
     """, unsafe_allow_html=True)
 
+    # Present
     st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span>Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
     if present_students:
         cols = st.columns(5)
         for i, (name, img) in enumerate(present_students.items()):
             with cols[i % 5]:
+                st.markdown('<div class="student-card">', unsafe_allow_html=True)
                 st.image(img, width=100)
-                st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;">{name}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;">{name}</div></div>', unsafe_allow_html=True)
 
+    # Absent
     st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span>Absent</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
     if missing:
         cols = st.columns(5)
         for i, name in enumerate(missing):
             with cols[i % 5]:
+                st.markdown('<div class="student-card">', unsafe_allow_html=True)
                 if name in reference_photos:
                     st.image(reference_photos[name], width=100)
-                st.markdown(f'<div style="text-align:center;color:#c4605a;font-weight:600;font-size:13px;">{name}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="text-align:center;color:#c4605a;font-weight:600;font-size:13px;">{name}</div></div>', unsafe_allow_html=True)
     else:
         st.success("Everyone's here today!")
 
-# -------------------------
-# Mode content
-# -------------------------
+# ---- Mode content ----
 if st.session_state.mode == "upload":
     st.markdown("""
     <div class="upload-zone">
@@ -554,7 +654,7 @@ if st.session_state.mode == "upload":
     """, unsafe_allow_html=True)
     class_file = st.file_uploader("", type=["jpg","jpeg","png"], label_visibility="collapsed")
     st.markdown("""
-    <button class="action-btn" onclick="document.querySelector('[data-testid=stFormSubmitButton]')?.click()">
+    <button class="action-btn" onclick="document.querySelectorAll('button[kind=secondary]')[0]?.click()">
         <span class="material-symbols-outlined">face_retouching_natural</span> Scan for Attendance
     </button>
     """, unsafe_allow_html=True)
@@ -565,14 +665,15 @@ if st.session_state.mode == "upload":
             class_image.thumbnail((1200, 1200))
         if st.button("Scan", key="scan_upload"):
             recognize_faces(class_image, confidence, threshold)
+
 elif st.session_state.mode == "random":
     st.markdown('<p class="mode-desc">Generate a random class photo with students on a classroom background.</p>', unsafe_allow_html=True)
     st.markdown("""
-    <button class="action-btn" onclick="document.querySelectorAll('button[kind=primary]')[0]?.click()">
+    <button class="action-btn" onclick="document.querySelectorAll('button[kind=secondary]')[0]?.click()">
         <span class="material-symbols-outlined">shuffle</span> Generate Class Photo
     </button>
     """, unsafe_allow_html=True)
-    if st.button("Generate", key="gen_btn", type="primary"):
+    if st.button("Generate", key="gen_btn"):
         with st.spinner("Generating class photo..."):
             result_img, present = generate_class_image()
         pil_image = Image.fromarray(result_img)
@@ -590,9 +691,9 @@ elif st.session_state.mode == "camera":
         if max(class_image.size) > 1200:
             class_image.thumbnail((1200, 1200))
         st.markdown("""
-        <button class="action-btn" onclick="document.querySelectorAll('button[kind=primary]')[0]?.click()">
+        <button class="action-btn" onclick="document.querySelectorAll('button[kind=secondary]')[0]?.click()">
             <span class="material-symbols-outlined">face_retouching_natural</span> Scan for Attendance
         </button>
         """, unsafe_allow_html=True)
-        if st.button("Scan", key="scan_camera", type="primary"):
+        if st.button("Scan", key="scan_camera"):
             recognize_faces(class_image, confidence, threshold)
