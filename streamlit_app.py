@@ -8,6 +8,9 @@ import random
 import cv2
 from rembg import remove
 import json
+from datetime import datetime
+import pandas as pd
+from io import BytesIO
 
 st.set_page_config(
     page_title="Smart Attendance",
@@ -19,6 +22,8 @@ if "mode" not in st.session_state:
     st.session_state.mode = "upload"
 if "collected_photos" not in st.session_state:
     st.session_state.collected_photos = []
+if "last_results" not in st.session_state:
+    st.session_state.last_results = None
 
 st.markdown("""
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"/>
@@ -47,6 +52,10 @@ st.markdown("""
 }
 @keyframes progressFill {
     from { width: 0%; }
+}
+@keyframes scanLine {
+    0% { top: 0%; opacity: 1; }
+    100% { top: 100%; opacity: 0.3; }
 }
 .stApp {
     background: linear-gradient(135deg, #fdf6f0 0%, #fef9f5 50%, #fdf4ea 100%) !important;
@@ -81,13 +90,33 @@ st.markdown("""
     display: flex; align-items: center; justify-content: center; gap: 7px;
     font-family: 'Space Grotesk', sans-serif;
     transition: all 0.2s;
-    position: relative; overflow: hidden;
 }
 .mode-tab:hover { border-color: #c99566; transform: translateY(-2px); box-shadow: 0 4px 12px #c9956620; }
 .mode-tab:active { transform: translateY(1px); }
 .mode-tab .material-symbols-outlined { font-size: 18px; }
 .mode-tab.active { background: linear-gradient(135deg, #c99566, #b5784a); border-color: transparent; color: white; }
 .mode-tab.active .material-symbols-outlined { color: white; }
+.scan-container {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+.scan-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 10;
+    border-radius: 8px;
+    overflow: hidden;
+}
+.scan-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #c99566, #d4a853, #c99566, transparent);
+    animation: scanLine 1.5s ease-in-out infinite;
+    box-shadow: 0 0 12px #c9956680;
+}
 .upload-zone {
     border: 1.5px dashed #c9956650;
     border-radius: 14px; padding: 2.5rem;
@@ -183,6 +212,8 @@ if not os.path.exists(EXTRACT_PATH):
 
 REFERENCE_DIR = os.path.join(EXTRACT_PATH, "content", "My_Classmates_small")
 ROSTER_FILE = os.path.join(BASE_DIR, "student_roster.json")
+ABSENCE_FILE = os.path.join(BASE_DIR, "absence_counter.json")
+ABSENCE_THRESHOLD = 3
 
 def load_roster():
     if os.path.exists(ROSTER_FILE):
@@ -193,6 +224,35 @@ def load_roster():
 def save_roster(roster):
     with open(ROSTER_FILE, "w") as f:
         json.dump(roster, f)
+
+def load_absences():
+    if os.path.exists(ABSENCE_FILE):
+        with open(ABSENCE_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_absences(absences):
+    with open(ABSENCE_FILE, "w") as f:
+        json.dump(absences, f)
+
+def update_absences(missing_students):
+    absences = load_absences()
+    for name in missing_students:
+        absences[name] = absences.get(name, 0) + 1
+    save_absences(absences)
+    return absences
+
+def export_to_excel(present, missing, date_str):
+    output = BytesIO()
+    rows = []
+    for name in present:
+        rows.append({"Name": name, "Status": "Present", "Date": date_str})
+    for name in missing:
+        rows.append({"Name": name, "Status": "Absent", "Date": date_str})
+    df = pd.DataFrame(rows)
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name="Attendance")
+    return output.getvalue()
 
 if "student_roster" not in st.session_state:
     st.session_state.student_roster = load_roster()
@@ -254,18 +314,33 @@ st.markdown("""
 
 # ---- Sidebar ----
 with st.sidebar:
-    # 1. רשימת תלמידים
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">group</span> Class roster</div>', unsafe_allow_html=True)
+    absences = load_absences()
     for s in STUDENT_ROSTER:
-        st.markdown(f'<div class="sidebar-student"><span class="material-symbols-outlined">person</span>{s}</div>', unsafe_allow_html=True)
+        count = absences.get(s, 0)
+        warning = f' <span style="color:#ff8c00;font-size:11px;">⚠ {count}x absent</span>' if count >= ABSENCE_THRESHOLD else ''
+        st.markdown(f'<div class="sidebar-student"><span class="material-symbols-outlined">person</span>{s}{warning}</div>', unsafe_allow_html=True)
 
-    # 2. כפתור ייצוא למשוב
-    if st.button("Export to Mashov", key="export_btn"):
-        st.toast("Coming soon! Mashov integration will be available in the next version.", icon="🔗")
+    # Export button
+    if st.session_state.last_results is not None:
+        results = st.session_state.last_results
+        excel_data = export_to_excel(
+            results["present"],
+            results["missing"],
+            results["date"]
+        )
+        st.download_button(
+            label="Export to Mashov",
+            data=excel_data,
+            file_name=f"attendance_{results['date'].replace(' ','_').replace(':','-')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="export_btn"
+        )
+    else:
+        if st.button("Export to Mashov", key="export_btn_disabled"):
+            st.toast("Run a scan first to export results.", icon="ℹ️")
 
     st.markdown("---")
-
-    # 3. ניהול תלמידים
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">manage_accounts</span> Manage Students</div>', unsafe_allow_html=True)
 
     with st.expander("Remove student"):
@@ -341,8 +416,6 @@ with st.sidebar:
                 st.rerun()
 
     st.markdown("---")
-
-    # 4. הגדרות - בתחתית
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">tune</span> Settings</div>', unsafe_allow_html=True)
     threshold = st.slider("Detection threshold", 0.0, 1.0, 0.4)
     confidence = st.slider("Face confidence", 0.5, 1.0, 0.7)
@@ -448,9 +521,24 @@ def cosine_distance(a, b):
     return 1 - np.dot(a, b)
 
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
+    # אנימציית scan
+    scan_placeholder = st.empty()
+    scan_placeholder.markdown("""
+    <div class="scan-container">
+        <div class="scan-overlay">
+            <div class="scan-line"></div>
+        </div>
+        <div style="background:#c9956615;border-radius:8px;padding:2rem;text-align:center;">
+            <span class="material-symbols-outlined" style="font-size:48px;color:#c99566;">document_scanner</span>
+            <p style="color:#b09080;margin-top:8px;font-size:14px;">Scanning photo...</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
     progress = st.progress(0, text="Detecting faces...")
     faces, original_img_rgb = extract_faces(image_pil, confidence_threshold)
     progress.progress(30, text="Analyzing faces...")
+    scan_placeholder.empty()
 
     present_students = {}
     recognized_faces = []
@@ -522,6 +610,17 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     known_present = {k: v for k, v in present_students.items() if not v["unknown"]}
     missing = [s for s in STUDENT_ROSTER if s not in known_present]
     attendance_pct = int(len(known_present) / max(len(STUDENT_ROSTER), 1) * 100)
+    date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    # עדכון היעדרויות
+    updated_absences = update_absences(missing)
+
+    # שמירת תוצאות לייצוא
+    st.session_state.last_results = {
+        "present": list(known_present.keys()),
+        "missing": missing,
+        "date": date_str
+    }
 
     st.markdown(f"""
     <div class="stat-row">
@@ -546,6 +645,22 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     </div>
     """, unsafe_allow_html=True)
 
+    # התראות היעדרות
+    chronic_absent = [s for s in missing if updated_absences.get(s, 0) >= ABSENCE_THRESHOLD]
+    if chronic_absent:
+        names = ", ".join(chronic_absent)
+        st.markdown(f"""
+        <div style="background:#c4605a15;border:1.5px solid #c4605a50;border-radius:12px;
+            padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
+            <span class="material-symbols-outlined" style="color:#c4605a;font-size:24px;">notification_important</span>
+            <div>
+                <div style="font-weight:700;color:#a03030;font-size:14px;">Chronic absence alert!</div>
+                <div style="color:#904040;font-size:12px;">{names} have been absent {ABSENCE_THRESHOLD}+ times.</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Unknown alert
     has_unknown = any(v["unknown"] for v in present_students.values())
     if has_unknown:
         st.markdown("""
@@ -584,7 +699,10 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                 st.markdown('<div class="student-card">', unsafe_allow_html=True)
                 if name in reference_photos:
                     st.image(reference_photos[name], width=100)
-                st.markdown(f'<div style="text-align:center;color:#c4605a;font-weight:600;font-size:13px;">{name}</div></div>', unsafe_allow_html=True)
+                absence_count = updated_absences.get(name, 0)
+                color = "#c4605a" if absence_count < ABSENCE_THRESHOLD else "#a03030"
+                badge = f' <span style="font-size:10px;background:#c4605a20;padding:2px 6px;border-radius:10px;">{absence_count}x</span>' if absence_count > 0 else ''
+                st.markdown(f'<div style="text-align:center;color:{color};font-weight:600;font-size:13px;">{name}{badge}</div></div>', unsafe_allow_html=True)
     else:
         st.success("Everyone's here today!")
 
