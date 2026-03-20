@@ -17,10 +17,25 @@ st.set_page_config(
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0');
 
 * { font-family: 'Space Grotesk', sans-serif !important; }
-.emoji { font-family: 'Noto Color Emoji', sans-serif !important; }
+.material-symbols-outlined {
+    font-family: 'Material Symbols Outlined' !important;
+    font-weight: normal; font-style: normal;
+    font-size: 22px; line-height: 1;
+    letter-spacing: normal; text-transform: none;
+    display: inline-block; white-space: nowrap;
+    word-wrap: normal; direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+}
+.icon-rose { color: #c99566; }
+.icon-green { color: #7a9e6a; }
+.icon-red { color: #c4605a; }
+.icon-gold { color: #d4a853; }
+.icon-muted { color: #b09080; }
 
 .stApp {
     background: linear-gradient(135deg, #fdf6f0 0%, #fef9f5 50%, #fdf4ea 100%) !important;
@@ -37,8 +52,8 @@ st.markdown("""
     background: linear-gradient(135deg, #c99566, #b5784a);
     border-radius: 14px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 26px; font-family: 'Noto Color Emoji', sans-serif !important;
 }
+.header-icon .material-symbols-outlined { font-size: 28px; color: white; }
 .header-title {
     font-size: 28px; font-weight: 700;
     background: linear-gradient(90deg, #b5784a, #c99566, #d4a853);
@@ -51,13 +66,19 @@ st.markdown("""
     flex: 1; background: #fff;
     border: 1px solid #c9956625;
     border-radius: 12px; padding: 16px 18px;
+    display: flex; flex-direction: column; gap: 4px;
 }
-.stat-label { font-size: 11px; color: #b09080; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-label {
+    font-size: 11px; color: #b09080;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    display: flex; align-items: center; gap: 5px;
+}
 .stat-val { font-size: 28px; font-weight: 700; }
-.stat-sub { font-size: 11px; color: #c0a898; margin-top: 3px; }
+.stat-sub { font-size: 11px; color: #c0a898; }
 .stat-green { color: #7a9e6a; }
 .stat-red { color: #c4605a; }
-.stat-gold { background: linear-gradient(90deg, #b5784a, #d4a853); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.stat-gold { background: linear-gradient(90deg, #b5784a, #d4a853);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 
 .stRadio > div { flex-direction: row !important; gap: 8px; }
 .stRadio label {
@@ -68,7 +89,6 @@ st.markdown("""
     color: #a07858 !important;
     font-size: 14px !important;
     font-weight: 500 !important;
-    transition: all 0.2s !important;
 }
 .stRadio label:has(input:checked) {
     background: linear-gradient(135deg, #c99566, #b5784a) !important;
@@ -99,8 +119,8 @@ st.markdown("""
     text-align: center; background: #c9956610;
     margin-bottom: 1rem;
 }
-.upload-icon { font-size: 36px; margin-bottom: 10px; font-family: 'Noto Color Emoji', sans-serif !important; }
-.upload-text { font-size: 15px; color: #8a5a3a; margin-bottom: 4px; font-weight: 500; }
+.upload-icon .material-symbols-outlined { font-size: 44px; color: #c99566; }
+.upload-text { font-size: 15px; color: #8a5a3a; margin: 8px 0 4px; font-weight: 500; }
 .upload-sub { font-size: 12px; color: #b09080; }
 
 .section-divider {
@@ -115,16 +135,19 @@ st.markdown("""
 }
 .badge-present { background: #7a9e6a20; color: #7a9e6a; }
 .badge-absent { background: #c4605a20; color: #c4605a; }
+.badge-present .material-symbols-outlined,
+.badge-absent .material-symbols-outlined { font-size: 15px; }
 
 [data-testid="stSidebar"] {
     background: #fef5ee !important;
     border-right: 1px solid #c9956620 !important;
 }
 .sidebar-title {
-    font-size: 15px; font-weight: 700;
-    color: #5a3a2a; margin-bottom: 1rem;
+    font-size: 15px; font-weight: 700; color: #5a3a2a;
+    margin-bottom: 1rem;
     display: flex; align-items: center; gap: 6px;
 }
+.sidebar-title .material-symbols-outlined { font-size: 18px; color: #c99566; }
 .sidebar-student {
     display: flex; align-items: center; gap: 8px;
     padding: 8px 10px; background: #fff;
@@ -132,11 +155,9 @@ st.markdown("""
     font-size: 13px; color: #7a5a4a;
     border: 1px solid #c9956618;
 }
-.student-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: linear-gradient(135deg, #c99566, #d4a853);
-    flex-shrink: 0;
-}
+.sidebar-student .material-symbols-outlined { font-size: 16px; color: #c99566; }
+
+.mode-desc { color: #b09080; font-size: 14px; margin-bottom: 1rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -197,7 +218,9 @@ reference_photos = load_reference_photos()
 # -------------------------
 st.markdown("""
 <div class="main-header">
-    <div class="header-icon">📸</div>
+    <div class="header-icon">
+        <span class="material-symbols-outlined">face_unlock</span>
+    </div>
     <div>
         <div class="header-title">Smart Attendance</div>
     </div>
@@ -208,13 +231,13 @@ st.markdown("""
 # Sidebar
 # -------------------------
 with st.sidebar:
-    st.markdown('<div class="sidebar-title"><span class="emoji">⚙️</span> Settings</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">tune</span> Settings</div>', unsafe_allow_html=True)
     threshold = st.slider("Detection threshold", 0.0, 1.0, 0.4)
     confidence = st.slider("Face confidence", 0.5, 1.0, 0.7)
     st.markdown("---")
-    st.markdown('<div class="sidebar-title"><span class="emoji">👥</span> Class roster</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">group</span> Class roster</div>', unsafe_allow_html=True)
     for s in STUDENT_ROSTER:
-        st.markdown(f'<div class="sidebar-student"><div class="student-dot"></div>{s}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="sidebar-student"><span class="material-symbols-outlined">person</span>{s}</div>', unsafe_allow_html=True)
 
 # -------------------------
 # Functions
@@ -302,7 +325,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     with st.spinner("Scanning faces..."):
         faces, original_img_rgb = extract_faces(image_pil, confidence_threshold)
 
-    st.markdown(f'<p style="color:#b09080; font-size:13px; margin-bottom:1rem;">{len(faces)} faces detected in photo</p>', unsafe_allow_html=True)
+    st.markdown(f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;display:flex;align-items:center;gap:5px;"><span class="material-symbols-outlined" style="font-size:16px;color:#c99566;">center_focus_strong</span> {len(faces)} faces detected</p>', unsafe_allow_html=True)
 
     present_students = {}
     recognized_faces = []
@@ -368,17 +391,26 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     st.markdown(f"""
     <div class="stat-row">
         <div class="stat-card">
-            <div class="stat-label">Present</div>
+            <div class="stat-label">
+                <span class="material-symbols-outlined" style="font-size:14px;color:#7a9e6a;">check_circle</span>
+                Present
+            </div>
             <div class="stat-val stat-green">{len(present_students)}</div>
             <div class="stat-sub">out of {len(STUDENT_ROSTER)}</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Absent</div>
+            <div class="stat-label">
+                <span class="material-symbols-outlined" style="font-size:14px;color:#c4605a;">cancel</span>
+                Absent
+            </div>
             <div class="stat-val stat-red">{len(missing_students)}</div>
             <div class="stat-sub">check required</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Attendance</div>
+            <div class="stat-label">
+                <span class="material-symbols-outlined" style="font-size:14px;color:#d4a853;">insights</span>
+                Attendance
+            </div>
             <div class="stat-val stat-gold">{pct}%</div>
             <div class="stat-sub">today</div>
         </div>
@@ -386,23 +418,23 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     """, unsafe_allow_html=True)
 
     # Present
-    st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="emoji">✅</span> Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span> Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
     if present_students:
         cols = st.columns(5)
         for i, (name, img) in enumerate(present_students.items()):
             with cols[i % 5]:
                 st.image(img, width=100)
-                st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;font-family:Space Grotesk,sans-serif;">{name}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;">{name}</div>', unsafe_allow_html=True)
 
     # Absent
-    st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-absent"><span class="emoji">❌</span> Absent</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span> Absent</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
     if missing_students:
         cols = st.columns(5)
         for i, name in enumerate(missing_students):
             with cols[i % 5]:
                 if name in reference_photos:
                     st.image(reference_photos[name], width=100)
-                st.markdown(f'<div style="text-align:center;color:#c4605a;font-weight:600;font-size:13px;font-family:Space Grotesk,sans-serif;">{name}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="text-align:center;color:#c4605a;font-weight:600;font-size:13px;">{name}</div>', unsafe_allow_html=True)
     else:
         st.success("Everyone's here today!")
 
@@ -411,20 +443,22 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 # -------------------------
 mode = st.radio(
     "",
-    [
-        "📤  Upload Photo",
-        "🎲  Random Class",
-        "📷  Live Camera"
-    ],
+    ["upload  Upload Photo", "shuffle  Random Class", "photo_camera  Live Camera"],
     horizontal=True
 )
 
 st.markdown("<div style='margin-bottom:1rem;'></div>", unsafe_allow_html=True)
 
-if mode == "📤  Upload Photo":
-    st.markdown('<div class="upload-zone"><div class="upload-icon">🖼️</div><div class="upload-text">Drop your class photo here</div><div class="upload-sub">JPG · PNG · JPEG</div></div>', unsafe_allow_html=True)
+if mode == "upload  Upload Photo":
+    st.markdown("""
+    <div class="upload-zone">
+        <div class="upload-icon"><span class="material-symbols-outlined">cloud_upload</span></div>
+        <div class="upload-text">Drop your class photo here</div>
+        <div class="upload-sub">JPG · PNG · JPEG</div>
+    </div>
+    """, unsafe_allow_html=True)
     class_file = st.file_uploader("", type=["jpg","jpeg","png"], label_visibility="collapsed")
-    if st.button("🔍  Scan for Attendance"):
+    if st.button("Scan for Attendance"):
         if class_file is None:
             st.warning("Please upload a photo first")
             st.stop()
@@ -434,9 +468,9 @@ if mode == "📤  Upload Photo":
             class_image.thumbnail((1200, 1200))
         recognize_faces(class_image, confidence, threshold)
 
-elif mode == "🎲  Random Class":
-    st.markdown('<p style="color:#b09080;font-size:14px;">Generate a random class photo with students placed on a classroom background.</p>', unsafe_allow_html=True)
-    if st.button("🎲  Generate Class Photo"):
+elif mode == "shuffle  Random Class":
+    st.markdown('<p class="mode-desc">Generate a random class photo with students placed on a classroom background.</p>', unsafe_allow_html=True)
+    if st.button("Generate Class Photo"):
         with st.spinner("Generating class photo..."):
             result_img, present = generate_class_image()
         pil_image = Image.fromarray(result_img)
@@ -446,12 +480,12 @@ elif mode == "🎲  Random Class":
         st.markdown("---")
         recognize_faces(pil_image, confidence, threshold)
 
-elif mode == "📷  Live Camera":
-    st.markdown('<p style="color:#b09080;font-size:14px;">Take a photo directly from your camera.</p>', unsafe_allow_html=True)
+elif mode == "photo_camera  Live Camera":
+    st.markdown('<p class="mode-desc">Take a photo directly from your camera.</p>', unsafe_allow_html=True)
     camera_photo = st.camera_input("")
     if camera_photo is not None:
         class_image = Image.open(camera_photo)
         if max(class_image.size) > 1200:
             class_image.thumbnail((1200, 1200))
-        if st.button("🔍  Scan for Attendance"):
+        if st.button("Scan for Attendance"):
             recognize_faces(class_image, confidence, threshold)
