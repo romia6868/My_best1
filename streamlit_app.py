@@ -240,7 +240,6 @@ def load_reference_photos():
 reference_embeddings = load_reference_embeddings()
 reference_photos = load_reference_photos()
 
-# ---- Header ----
 st.markdown("""
 <div class="main-header">
     <div class="header-icon">
@@ -252,7 +251,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ---- Sidebar ----
 with st.sidebar:
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">tune</span> Settings</div>', unsafe_allow_html=True)
     threshold = st.slider("Detection threshold", 0.0, 1.0, 0.4)
@@ -261,7 +259,6 @@ with st.sidebar:
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">group</span> Class roster</div>', unsafe_allow_html=True)
     for s in STUDENT_ROSTER:
         st.markdown(f'<div class="sidebar-student"><span class="material-symbols-outlined">person</span>{s}</div>', unsafe_allow_html=True)
-
     st.markdown("---")
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">manage_accounts</span> Manage Students</div>', unsafe_allow_html=True)
 
@@ -281,10 +278,8 @@ with st.sidebar:
     with st.expander("Add new student"):
         new_name = st.text_input("Student name", placeholder="e.g. Noa", key="new_name")
         photo_method = st.radio("Photo method", ["📷 Camera", "📤 Upload"], key="photo_method", horizontal=True)
-
         if new_name:
             photos_collected = []
-
             if photo_method == "📷 Camera":
                 st.markdown(f'<p style="color:#b09080;font-size:12px;">Collected: <b style="color:#c99566;">{len(st.session_state.collected_photos)}/10</b></p>', unsafe_allow_html=True)
                 if len(st.session_state.collected_photos) > 0:
@@ -312,8 +307,7 @@ with st.sidebar:
             can_save = len(photos_collected) >= 5
             if st.button(
                 "Save student" if can_save else f"Need {max(0, 5-len(photos_collected))} more",
-                key="save_student",
-                disabled=not can_save
+                key="save_student", disabled=not can_save
             ):
                 student_dir = os.path.join(REFERENCE_DIR, new_name)
                 os.makedirs(student_dir, exist_ok=True)
@@ -340,7 +334,6 @@ with st.sidebar:
                 st.success(f"✓ {new_name} added!")
                 st.rerun()
 
-# ---- Mode tabs ----
 st.markdown(f"""
 <div class="mode-tabs">
     <button class="mode-tab {'active' if st.session_state.mode == 'upload' else ''}"
@@ -364,7 +357,6 @@ if "mode" in params:
     st.query_params.clear()
     st.rerun()
 
-# ---- Functions ----
 def generate_class_image():
     background_options = [
         os.path.join(BASE_DIR, "הורדה.jfif"),
@@ -474,16 +466,20 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         if best_dist > threshold:
             best_name = None
 
+        # ← שינוי: טיפול בפנים לא מזוהות
         if best_name and best_name not in present_students:
-            present_students[best_name] = img
-            recognized_faces.append({"name": best_name, "box": box, "dist": best_dist})
+            present_students[best_name] = {"img": img, "unknown": False}
+            recognized_faces.append({"name": best_name, "box": box, "dist": best_dist, "unknown": False})
+        elif best_name is None:
+            unknown_key = f"Unknown_{i}"
+            present_students[unknown_key] = {"img": img, "unknown": True}
+            recognized_faces.append({"name": "Unknown", "box": box, "dist": 1.0, "unknown": True})
 
     progress.progress(100, text="Done!")
     progress.empty()
 
     st.markdown(f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;display:flex;align-items:center;gap:5px;"><span class="material-symbols-outlined" style="font-size:16px;color:#c99566;">center_focus_strong</span> {len(faces)} faces detected</p>', unsafe_allow_html=True)
 
-    # Draw boxes
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
     font_name = font_conf = None
@@ -497,23 +493,29 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         font_name = ImageFont.load_default(size=32)
         font_conf = ImageFont.load_default(size=20)
 
+    # ← שינוי: ציור עם הבחנה בין ידוע ולא ידוע
     for face in recognized_faces:
         x, y, w, h = face["box"]
-        pct = int((1 - face["dist"]) * 100)
-        draw.rectangle([x, y, x+w, y+h], outline=(201,149,102), width=3)
-        draw.text((x, y-42), face["name"], fill=(181,120,74), font=font_name)
-        draw.text((x, y-20), f"{pct}%", fill=(212,168,83), font=font_conf)
+        if face["unknown"]:
+            draw.rectangle([x, y, x+w, y+h], outline=(220,100,30), width=3)
+            draw.text((x, y-42), "Unknown", fill=(220,100,30), font=font_name)
+        else:
+            pct = int((1 - face["dist"]) * 100)
+            draw.rectangle([x, y, x+w, y+h], outline=(201,149,102), width=3)
+            draw.text((x, y-42), face["name"], fill=(181,120,74), font=font_name)
+            draw.text((x, y-20), f"{pct}%", fill=(212,168,83), font=font_conf)
 
     st.image(img_draw, use_column_width=True)
 
-    missing = [s for s in STUDENT_ROSTER if s not in present_students]
-    attendance_pct = int(len(present_students) / max(len(STUDENT_ROSTER), 1) * 100)
+    known_present = {k: v for k, v in present_students.items() if not v["unknown"]}
+    missing = [s for s in STUDENT_ROSTER if s not in known_present]
+    attendance_pct = int(len(known_present) / max(len(STUDENT_ROSTER), 1) * 100)
 
     st.markdown(f"""
     <div class="stat-row">
         <div class="stat-card">
             <div class="stat-label"><span class="material-symbols-outlined" style="color:#7a9e6a;">check_circle</span>Present</div>
-            <div class="stat-val stat-green">{len(present_students)}</div>
+            <div class="stat-val stat-green">{len(known_present)}</div>
             <div class="stat-sub">out of {len(STUDENT_ROSTER)}</div>
         </div>
         <div class="stat-card">
@@ -532,15 +534,37 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     </div>
     """, unsafe_allow_html=True)
 
+    # ← שינוי: הודעת אזהרה אם יש פנים לא מזוהות
+    has_unknown = any(v["unknown"] for v in present_students.values())
+    if has_unknown:
+        st.markdown("""
+        <div style="background:#ff8c0015;border:1.5px solid #ff8c0050;border-radius:12px;
+            padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
+            <span class="material-symbols-outlined" style="color:#ff8c00;font-size:24px;">warning</span>
+            <div>
+                <div style="font-weight:700;color:#c45a00;font-size:14px;">Unidentified person detected!</div>
+                <div style="color:#b07040;font-size:12px;">Someone in the photo is not in the class roster.</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
     # Present
     st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span>Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
     if present_students:
         cols = st.columns(5)
-        for i, (name, img) in enumerate(present_students.items()):
+        for i, (name, data) in enumerate(present_students.items()):
             with cols[i % 5]:
-                st.markdown('<div class="student-card">', unsafe_allow_html=True)
-                st.image(img, width=100)
-                st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;">{name}</div></div>', unsafe_allow_html=True)
+                if data["unknown"]:
+                    st.markdown('<div class="student-card">', unsafe_allow_html=True)
+                    st.image(data["img"], width=100)
+                    st.markdown("""
+                    <div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">⚠ Unknown</div>
+                    <div style="text-align:center;color:#b07040;font-size:11px;">Not in roster</div>
+                    </div>""", unsafe_allow_html=True)
+                else:
+                    st.markdown('<div class="student-card">', unsafe_allow_html=True)
+                    st.image(data["img"], width=100)
+                    st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;">{name}</div></div>', unsafe_allow_html=True)
 
     # Absent
     st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span>Absent</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
