@@ -7,3 +7,5 @@ tf-keras
 opencv-python-headless
 rembg
 onnxruntime
+openpyxl
+pandas
