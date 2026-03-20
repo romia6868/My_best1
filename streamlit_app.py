@@ -173,7 +173,7 @@ button_css = """
     width: 100% !important;
     transition: all 0.2s !important;
     font-family: 'Space Grotesk', sans-serif !important;
-    margin-top: 0 !important;
+    margin-top: 255 !important;
 }
 .stButton > button:hover {
     border-color: #8c7b75 !important;
