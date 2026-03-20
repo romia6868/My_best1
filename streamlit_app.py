@@ -60,7 +60,7 @@ css = """
     100% { top: 100%; opacity: 0.3; }
 }
 .stApp {
-    background: linear-gradient(135deg, #f8edeb 0%, #fae1dd 50%, #fcd5ce 100%) !important;
+    background: #e8e8e4 !important;
 }
 .main-header {
     display: flex; align-items: center; gap: 14px;
