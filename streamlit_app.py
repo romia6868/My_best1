@@ -24,8 +24,12 @@ if "collected_photos" not in st.session_state:
     st.session_state.collected_photos = []
 if "last_results" not in st.session_state:
     st.session_state.last_results = None
+if "absence_counter" not in st.session_state:
+    st.session_state.absence_counter = {}
 
-st.markdown("""
+ABSENCE_THRESHOLD = 3
+
+css = """
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"/>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"/>
 <style>
@@ -50,9 +54,7 @@ st.markdown("""
     0% { background-position: -400px 0; }
     100% { background-position: 400px 0; }
 }
-@keyframes progressFill {
-    from { width: 0%; }
-}
+@keyframes progressFill { from { width: 0%; } }
 @keyframes scanLine {
     0% { top: 0%; opacity: 1; }
     100% { top: 100%; opacity: 0.3; }
@@ -96,7 +98,6 @@ st.markdown("""
     text-align: center; background: #c9956610;
     margin-bottom: 1rem; transition: all 0.2s;
 }
-.upload-zone:hover { border-color: #c99566; background: #c9956618; }
 .upload-zone .material-symbols-outlined { font-size: 44px; color: #c99566; }
 .upload-text { font-size: 15px; color: #8a5a3a; margin: 8px 0 4px; font-weight: 500; }
 .upload-sub { font-size: 12px; color: #b09080; }
@@ -108,16 +109,12 @@ st.markdown("""
     transition: all 0.2s; position: relative; overflow: hidden;
 }
 .stat-card::after {
-    content: '';
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     background: linear-gradient(90deg, transparent, #c9956612, transparent);
-    background-size: 400px 100%;
-    animation: shimmer 2.5s infinite;
+    background-size: 400px 100%; animation: shimmer 2.5s infinite;
 }
-.stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px #c9956618; border-color: #c9956640; }
 .stat-label {
-    font-size: 11px; color: #b09080;
-    text-transform: uppercase; letter-spacing: 0.5px;
+    font-size: 11px; color: #b09080; text-transform: uppercase; letter-spacing: 0.5px;
     display: flex; align-items: center; gap: 5px; margin-bottom: 6px;
 }
 .stat-label .material-symbols-outlined { font-size: 14px; }
@@ -152,11 +149,13 @@ st.markdown("""
     border: 1px solid #c9956618;
     transition: all 0.2s; cursor: default;
 }
-.sidebar-student:hover { border-color: #c99566; transform: translateX(4px); box-shadow: 2px 0 8px #c9956620; }
 .sidebar-student .material-symbols-outlined { font-size: 16px; color: #c99566; }
 .mode-desc { color: #b09080; font-size: 14px; margin-bottom: 1rem; }
+</style>
+"""
 
-/* ---- כפתורי טאב ---- */
+button_css = """
+<style>
 .stButton > button {
     background: #fff !important;
     color: #a07858 !important;
@@ -204,9 +203,11 @@ st.markdown("""
     background: #c9956615 !important;
     transform: translateY(-1px) !important;
 }
-
 </style>
-""", unsafe_allow_html=True)
+"""
+
+st.markdown(css, unsafe_allow_html=True)
+st.markdown(button_css, unsafe_allow_html=True)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ZIP_PATH = os.path.join(BASE_DIR, "My_Classmates_small.zip")
@@ -217,8 +218,6 @@ if not os.path.exists(EXTRACT_PATH):
 
 REFERENCE_DIR = os.path.join(EXTRACT_PATH, "content", "My_Classmates_small")
 ROSTER_FILE = os.path.join(BASE_DIR, "student_roster.json")
-ABSENCE_FILE = os.path.join(BASE_DIR, "absence_counter.json")
-ABSENCE_THRESHOLD = 3
 
 def load_roster():
     if os.path.exists(ROSTER_FILE):
@@ -230,22 +229,10 @@ def save_roster(roster):
     with open(ROSTER_FILE, "w") as f:
         json.dump(roster, f)
 
-def load_absences():
-    if os.path.exists(ABSENCE_FILE):
-        with open(ABSENCE_FILE, "r") as f:
-            return json.load(f)
-    return {}
-
-def save_absences(absences):
-    with open(ABSENCE_FILE, "w") as f:
-        json.dump(absences, f)
-
 def update_absences(missing_students):
-    absences = load_absences()
     for name in missing_students:
-        absences[name] = absences.get(name, 0) + 1
-    save_absences(absences)
-    return absences
+        st.session_state.absence_counter[name] = st.session_state.absence_counter.get(name, 0) + 1
+    return st.session_state.absence_counter
 
 def export_to_excel(present, missing, date_str):
     output = BytesIO()
@@ -317,14 +304,17 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ---- Sidebar ----
 with st.sidebar:
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">group</span> Class roster</div>', unsafe_allow_html=True)
-    absences = load_absences()
     for s in STUDENT_ROSTER:
-        count = absences.get(s, 0)
-        warning = f' <span style="color:#ff8c00;font-size:11px;">⚠ {count}x absent</span>' if count >= ABSENCE_THRESHOLD else ''
-        st.markdown(f'<div class="sidebar-student"><span class="material-symbols-outlined">person</span>{s}{warning}</div>', unsafe_allow_html=True)
+        count = st.session_state.absence_counter.get(s, 0)
+        if count >= ABSENCE_THRESHOLD:
+            badge = f'<span style="margin-left:auto;background:#c4605a;color:white;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;">!{count}</span>'
+        elif count > 0:
+            badge = f'<span style="margin-left:auto;color:#b09080;font-size:11px;">{count}x</span>'
+        else:
+            badge = ''
+        st.markdown(f'<div class="sidebar-student"><span class="material-symbols-outlined">person</span>{s}{badge}</div>', unsafe_allow_html=True)
 
     if st.session_state.last_results is not None:
         results = st.session_state.last_results
@@ -421,11 +411,7 @@ with st.sidebar:
 
 # ---- Mode tabs ----
 tab_cols = st.columns(3)
-tab_data = [
-    ("upload", "Upload Photo"),
-    ("random", "Random Class"),
-    ("camera", "Live Camera"),
-]
+tab_data = [("upload", "Upload Photo"), ("random", "Random Class"), ("camera", "Live Camera")]
 for idx, (mode_key, label) in enumerate(tab_data):
     with tab_cols[idx]:
         is_active = st.session_state.mode == mode_key
@@ -565,7 +551,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     progress.progress(100, text="Done!")
     progress.empty()
 
-    st.markdown(f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;display:flex;align-items:center;gap:5px;"><span class="material-symbols-outlined" style="font-size:16px;color:#c99566;">center_focus_strong</span> {len(faces)} faces detected</p>', unsafe_allow_html=True)
+    st.markdown(f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;">{len(faces)} faces detected</p>', unsafe_allow_html=True)
 
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
@@ -664,10 +650,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                 if data["unknown"]:
                     st.markdown('<div class="student-card">', unsafe_allow_html=True)
                     st.image(data["img"], width=100)
-                    st.markdown("""
-                    <div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">⚠ Unknown</div>
-                    <div style="text-align:center;color:#b07040;font-size:11px;">Not in roster</div>
-                    </div>""", unsafe_allow_html=True)
+                    st.markdown('<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div><div style="text-align:center;color:#b07040;font-size:11px;">Not in roster</div></div>', unsafe_allow_html=True)
                 else:
                     st.markdown('<div class="student-card">', unsafe_allow_html=True)
                     st.image(data["img"], width=100)
@@ -682,9 +665,9 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                 if name in reference_photos:
                     st.image(reference_photos[name], width=100)
                 absence_count = updated_absences.get(name, 0)
-                color = "#c4605a" if absence_count < ABSENCE_THRESHOLD else "#a03030"
-                badge = f' <span style="font-size:10px;background:#c4605a20;padding:2px 6px;border-radius:10px;">{absence_count}x</span>' if absence_count > 0 else ''
-                st.markdown(f'<div style="text-align:center;color:{color};font-weight:600;font-size:13px;">{name}{badge}</div></div>', unsafe_allow_html=True)
+                color = "#a03030" if absence_count >= ABSENCE_THRESHOLD else "#c4605a"
+                badge = f'<span style="font-size:10px;background:#c4605a20;padding:2px 6px;border-radius:10px;">{absence_count}x</span>' if absence_count > 0 else ''
+                st.markdown(f'<div style="text-align:center;color:{color};font-weight:600;font-size:13px;">{name} {badge}</div></div>', unsafe_allow_html=True)
     else:
         st.success("Everyone's here today!")
 
