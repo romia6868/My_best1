@@ -177,8 +177,10 @@ button_css = """
     transform: translateY(-2px) !important;
     box-shadow: 0 4px 12px #8c7b7520 !important;
 }
-.stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, #8c7b75, #6b5a54) !important;
+.stButton > button {
+    background: #f5f0ee !important;
+    color: #6b5a54 !important;
+    border: 1.5px solid #c4b8b2 !important;
     color: white !important;
     border: none !important;
     box-shadow: 0 4px 14px #8c7b7540 !important;
@@ -208,7 +210,15 @@ button_css = """
 }
 </style>
 """
-
+.stSlider > div > div > div > div {
+    background: #8c7b75 !important;
+}
+.stSlider > div > div > div {
+    background: #ddd5d0 !important;
+}
+[data-testid="stSlider"] label {
+    color: #6b5a54 !important;
+}
 button_css = """
 <style>
 .stButton > button {
