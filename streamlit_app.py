@@ -252,11 +252,20 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# ---- Sidebar ----
 with st.sidebar:
+    # 1. רשימת תלמידים
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">group</span> Class roster</div>', unsafe_allow_html=True)
     for s in STUDENT_ROSTER:
         st.markdown(f'<div class="sidebar-student"><span class="material-symbols-outlined">person</span>{s}</div>', unsafe_allow_html=True)
+
+    # 2. כפתור ייצוא למשוב
+    if st.button("Export to Mashov", key="export_btn"):
+        st.toast("Coming soon! Mashov integration will be available in the next version.", icon="🔗")
+
     st.markdown("---")
+
+    # 3. ניהול תלמידים
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">manage_accounts</span> Manage Students</div>', unsafe_allow_html=True)
 
     with st.expander("Remove student"):
@@ -332,81 +341,13 @@ with st.sidebar:
                 st.rerun()
 
     st.markdown("---")
+
+    # 4. הגדרות - בתחתית
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">tune</span> Settings</div>', unsafe_allow_html=True)
     threshold = st.slider("Detection threshold", 0.0, 1.0, 0.4)
     confidence = st.slider("Face confidence", 0.5, 1.0, 0.7)
-    with st.expander("Remove student"):
-        if STUDENT_ROSTER:
-            student_to_remove = st.selectbox("Select student", STUDENT_ROSTER, key="remove_select")
-            if st.button("Remove", key="remove_btn"):
-                st.session_state.student_roster.remove(student_to_remove)
-                save_roster(st.session_state.student_roster)
-                student_path = os.path.join(REFERENCE_DIR, student_to_remove)
-                if os.path.exists(student_path):
-                    import shutil
-                    shutil.rmtree(student_path)
-                st.success(f"{student_to_remove} removed!")
-                st.rerun()
 
-    with st.expander("Add new student"):
-        new_name = st.text_input("Student name", placeholder="e.g. Noa", key="new_name")
-        photo_method = st.radio("Photo method", ["📷 Camera", "📤 Upload"], key="photo_method", horizontal=True)
-        if new_name:
-            photos_collected = []
-            if photo_method == "📷 Camera":
-                st.markdown(f'<p style="color:#b09080;font-size:12px;">Collected: <b style="color:#c99566;">{len(st.session_state.collected_photos)}/10</b></p>', unsafe_allow_html=True)
-                if len(st.session_state.collected_photos) > 0:
-                    pct = len(st.session_state.collected_photos) * 10
-                    st.markdown(f'<div class="progress-container"><div class="progress-bar" style="width:{pct}%"></div></div>', unsafe_allow_html=True)
-                cam_img = st.camera_input("", key=f"cam_{len(st.session_state.collected_photos)}")
-                col1, col2 = st.columns(2)
-                with col1:
-                    if cam_img and st.button("Add photo", key="add_photo"):
-                        st.session_state.collected_photos.append(cam_img)
-                        st.rerun()
-                with col2:
-                    if st.button("Clear all", key="clear_photos"):
-                        st.session_state.collected_photos = []
-                        st.rerun()
-                photos_collected = st.session_state.collected_photos
-            else:
-                uploaded_files = st.file_uploader("Upload photos", type=["jpg","jpeg","png"], accept_multiple_files=True, key="upload_photos")
-                if uploaded_files:
-                    pct = min(len(uploaded_files) * 10, 100)
-                    st.markdown(f'<div class="progress-container"><div class="progress-bar" style="width:{pct}%"></div></div>', unsafe_allow_html=True)
-                    st.markdown(f'<p style="color:#{"7a9e6a" if len(uploaded_files)>=5 else "c99566"};font-size:12px;">{len(uploaded_files)}/10 photos</p>', unsafe_allow_html=True)
-                photos_collected = uploaded_files or []
-
-            can_save = len(photos_collected) >= 5
-            if st.button(
-                "Save student" if can_save else f"Need {max(0, 5-len(photos_collected))} more",
-                key="save_student", disabled=not can_save
-            ):
-                student_dir = os.path.join(REFERENCE_DIR, new_name)
-                os.makedirs(student_dir, exist_ok=True)
-                for idx, photo in enumerate(photos_collected):
-                    img = Image.open(photo).convert("RGB")
-                    img.save(os.path.join(student_dir, f"{new_name}_{idx+1}.jpg"))
-                if new_name not in st.session_state.student_roster:
-                    st.session_state.student_roster.append(new_name)
-                    save_roster(st.session_state.student_roster)
-                st.session_state.collected_photos = []
-                with st.spinner(f"Processing {new_name}'s photos..."):
-                    new_embeddings = []
-                    for idx in range(len(photos_collected)):
-                        img_path = os.path.join(student_dir, f"{new_name}_{idx+1}.jpg")
-                        try:
-                            result = DeepFace.represent(img_path=img_path, model_name="Facenet512", detector_backend="retinaface", enforce_detection=False)
-                            emb = np.array(result[0]["embedding"])
-                            emb = emb / np.linalg.norm(emb)
-                            new_embeddings.append(emb)
-                        except:
-                            pass
-                    if new_embeddings:
-                        reference_embeddings[new_name] = new_embeddings
-                st.success(f"✓ {new_name} added!")
-                st.rerun()
-
+# ---- Mode tabs ----
 st.markdown(f"""
 <div class="mode-tabs">
     <button class="mode-tab {'active' if st.session_state.mode == 'upload' else ''}"
