@@ -88,20 +88,6 @@ st.markdown("""
 .mode-tab .material-symbols-outlined { font-size: 18px; }
 .mode-tab.active { background: linear-gradient(135deg, #c99566, #b5784a); border-color: transparent; color: white; }
 .mode-tab.active .material-symbols-outlined { color: white; }
-.action-btn {
-    width: 100%; padding: 13px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, #c99566, #b5784a);
-    color: white; font-size: 15px; font-weight: 600;
-    border: none; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    font-family: 'Space Grotesk', sans-serif;
-    transition: all 0.2s; margin-top: 12px;
-    position: relative; overflow: hidden;
-}
-.action-btn:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 6px 18px #c9956640; }
-.action-btn:active { transform: translateY(1px); filter: brightness(0.95); }
-.action-btn .material-symbols-outlined { font-size: 20px; color: white; }
 .upload-zone {
     border: 1.5px dashed #c9956650;
     border-radius: 14px; padding: 2.5rem;
@@ -164,12 +150,27 @@ st.markdown("""
     font-size: 13px; color: #7a5a4a;
     border: 1px solid #c9956618;
     transition: all 0.2s; cursor: default;
-    position: relative; overflow: hidden;
 }
 .sidebar-student:hover { border-color: #c99566; transform: translateX(4px); box-shadow: 2px 0 8px #c9956620; }
 .sidebar-student .material-symbols-outlined { font-size: 16px; color: #c99566; }
 .mode-desc { color: #b09080; font-size: 14px; margin-bottom: 1rem; }
-.stButton { display: none !important; }
+.stButton > button {
+    background: linear-gradient(135deg, #c99566, #b5784a) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 12px 28px !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    width: 100% !important;
+    transition: all 0.2s !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+    margin-top: 12px !important;
+}
+.stButton > button:hover {
+    filter: brightness(1.08) !important;
+    transform: translateY(-1px) !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -466,7 +467,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         if best_dist > threshold:
             best_name = None
 
-        # ← שינוי: טיפול בפנים לא מזוהות
         if best_name and best_name not in present_students:
             present_students[best_name] = {"img": img, "unknown": False}
             recognized_faces.append({"name": best_name, "box": box, "dist": best_dist, "unknown": False})
@@ -493,7 +493,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         font_name = ImageFont.load_default(size=32)
         font_conf = ImageFont.load_default(size=20)
 
-    # ← שינוי: ציור עם הבחנה בין ידוע ולא ידוע
     for face in recognized_faces:
         x, y, w, h = face["box"]
         if face["unknown"]:
@@ -534,7 +533,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     </div>
     """, unsafe_allow_html=True)
 
-    # ← שינוי: הודעת אזהרה אם יש פנים לא מזוהות
     has_unknown = any(v["unknown"] for v in present_students.values())
     if has_unknown:
         st.markdown("""
@@ -548,7 +546,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         </div>
         """, unsafe_allow_html=True)
 
-    # Present
     st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span>Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
     if present_students:
         cols = st.columns(5)
@@ -566,7 +563,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                     st.image(data["img"], width=100)
                     st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;">{name}</div></div>', unsafe_allow_html=True)
 
-    # Absent
     st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span>Absent</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
     if missing:
         cols = st.columns(5)
@@ -589,27 +585,17 @@ if st.session_state.mode == "upload":
     </div>
     """, unsafe_allow_html=True)
     class_file = st.file_uploader("", type=["jpg","jpeg","png"], label_visibility="collapsed")
-    st.markdown("""
-    <button class="action-btn" onclick="document.querySelectorAll('button[kind=secondary]')[0]?.click()">
-        <span class="material-symbols-outlined">face_retouching_natural</span> Scan for Attendance
-    </button>
-    """, unsafe_allow_html=True)
     if class_file is not None:
         class_image = Image.open(class_file)
         class_image = ImageOps.exif_transpose(class_image)
         if max(class_image.size) > 1200:
             class_image.thumbnail((1200, 1200))
-        if st.button("Scan", key="scan_upload"):
+        if st.button("Scan for Attendance", key="scan_upload"):
             recognize_faces(class_image, confidence, threshold)
 
 elif st.session_state.mode == "random":
     st.markdown('<p class="mode-desc">Generate a random class photo with students on a classroom background.</p>', unsafe_allow_html=True)
-    st.markdown("""
-    <button class="action-btn" onclick="document.querySelectorAll('button[kind=secondary]')[0]?.click()">
-        <span class="material-symbols-outlined">shuffle</span> Generate Class Photo
-    </button>
-    """, unsafe_allow_html=True)
-    if st.button("Generate", key="gen_btn"):
+    if st.button("Generate Class Photo", key="gen_btn"):
         with st.spinner("Generating class photo..."):
             result_img, present = generate_class_image()
         pil_image = Image.fromarray(result_img)
@@ -626,10 +612,5 @@ elif st.session_state.mode == "camera":
         class_image = Image.open(camera_photo)
         if max(class_image.size) > 1200:
             class_image.thumbnail((1200, 1200))
-        st.markdown("""
-        <button class="action-btn" onclick="document.querySelectorAll('button[kind=secondary]')[0]?.click()">
-            <span class="material-symbols-outlined">face_retouching_natural</span> Scan for Attendance
-        </button>
-        """, unsafe_allow_html=True)
-        if st.button("Scan", key="scan_camera"):
+        if st.button("Scan for Attendance", key="scan_camera"):
             recognize_faces(class_image, confidence, threshold)
