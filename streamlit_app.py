@@ -175,24 +175,20 @@ st.markdown("""
     transform: translateY(-2px) !important;
     box-shadow: 0 4px 12px #c9956620 !important;
 }
-/* כפתור פעיל */
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, #c99566, #b5784a) !important;
     color: white !important;
     border: none !important;
     box-shadow: 0 4px 14px #c9956640 !important;
-}
-/* כפתורי פעולה גדולים */
-.scan-btn > div > button, .gen-btn > div > button {
-    background: linear-gradient(135deg, #c99566, #b5784a) !important;
-    color: white !important;
-    border: none !important;
     padding: 13px 28px !important;
     font-size: 15px !important;
     font-weight: 600 !important;
     margin-top: 12px !important;
 }
-/* כפתור ייצוא */
+.stButton > button[kind="primary"]:hover {
+    filter: brightness(1.08) !important;
+    transform: translateY(-2px) !important;
+}
 .stDownloadButton > button {
     background: #fff !important;
     color: #c99566 !important;
@@ -208,6 +204,7 @@ st.markdown("""
     background: #c9956615 !important;
     transform: translateY(-1px) !important;
 }
+
 </style>
 """, unsafe_allow_html=True)
 
