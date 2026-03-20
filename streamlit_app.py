@@ -28,6 +28,7 @@ if "absence_counter" not in st.session_state:
     st.session_state.absence_counter = {}
 
 ABSENCE_THRESHOLD = 3
+
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
@@ -160,21 +161,6 @@ css = """
 .stSlider > div > div > div { background: #e4dff0 !important; }
 [data-testid="stSlider"] label { color: #4a3a6a !important; }
 [data-testid="stThumbValue"] { color: white !important; }
-
-/* Hide real tab buttons */
-[data-testid="stHorizontalBlock"] .stButton > button {
-    opacity: 0 !important;
-    position: absolute !important;
-    width: 100% !important;
-    height: 100% !important;
-    top: 0 !important;
-    left: 0 !important;
-    cursor: pointer !important;
-    z-index: 2 !important;
-}
-[data-testid="stHorizontalBlock"] .stButton {
-    position: relative !important;
-}
 </style>
 """
 
@@ -233,6 +219,7 @@ button_css = """
 st.markdown(css, unsafe_allow_html=True)
 st.markdown(button_css, unsafe_allow_html=True)
 
+# ---- Tab buttons with icons ----
 tab_items = [
     ("upload", "cloud_upload", "Upload Photo"),
     ("random", "shuffle", "Random Class"),
@@ -274,7 +261,6 @@ with col3:
     if st.button("Live Camera", key="tab_camera", use_container_width=True):
         st.session_state.mode = "camera"
         st.rerun()
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ZIP_PATH = os.path.join(BASE_DIR, "My_Classmates_small.zip")
 EXTRACT_PATH = os.path.join(BASE_DIR, "My_Classmates")
