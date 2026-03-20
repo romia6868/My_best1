@@ -224,6 +224,28 @@ st.markdown("""
 # -------------------------
 # Sidebar
 # -------------------------
+# -------------------------
+# שמירת רשימת תלמידים בקובץ
+# -------------------------
+ROSTER_FILE = os.path.join(BASE_DIR, "student_roster.json")
+
+def load_roster():
+    if os.path.exists(ROSTER_FILE):
+        import json
+        with open(ROSTER_FILE, "r") as f:
+            return json.load(f)
+    return ['Maayan','Tomer','Roei','Zohar','Ilay']
+
+def save_roster(roster):
+    import json
+    with open(ROSTER_FILE, "w") as f:
+        json.dump(roster, f)
+
+if "student_roster" not in st.session_state:
+    st.session_state.student_roster = load_roster()
+
+STUDENT_ROSTER = st.session_state.student_roster
+
 with st.sidebar:
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">tune</span> Settings</div>', unsafe_allow_html=True)
     threshold = st.slider("Detection threshold", 0.0, 1.0, 0.4)
@@ -233,6 +255,85 @@ with st.sidebar:
     for s in STUDENT_ROSTER:
         st.markdown(f'<div class="sidebar-student"><span class="material-symbols-outlined">person</span>{s}</div>', unsafe_allow_html=True)
 
+    st.markdown("---")
+    st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">manage_accounts</span> Manage Students</div>', unsafe_allow_html=True)
+
+    # הסרת תלמיד
+    with st.expander("Remove student"):
+        student_to_remove = st.selectbox("Select student", STUDENT_ROSTER, key="remove_select")
+        if st.button("Remove", key="remove_btn"):
+            st.session_state.student_roster.remove(student_to_remove)
+            save_roster(st.session_state.student_roster)
+            student_path = os.path.join(REFERENCE_DIR, student_to_remove)
+            if os.path.exists(student_path):
+                import shutil
+                shutil.rmtree(student_path)
+            st.success(f"{student_to_remove} removed!")
+            st.rerun()
+
+    # הוספת תלמיד
+    with st.expander("Add new student"):
+        new_name = st.text_input("Student name", placeholder="e.g. Noa", key="new_name")
+        photo_method = st.radio("Photo method", ["📷 Camera", "📤 Upload"], key="photo_method", horizontal=True)
+
+        if new_name:
+            photos_collected = []
+
+            if photo_method == "📷 Camera":
+                if "collected_photos" not in st.session_state:
+                    st.session_state.collected_photos = []
+                st.markdown(f'<p style="color:#b09080;font-size:12px;">Collected: <b style="color:#c99566;">{len(st.session_state.collected_photos)}/10</b></p>', unsafe_allow_html=True)
+                cam_img = st.camera_input("", key=f"cam_{len(st.session_state.collected_photos)}")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if cam_img and st.button("Add photo", key="add_photo"):
+                        st.session_state.collected_photos.append(cam_img)
+                        st.rerun()
+                with col2:
+                    if st.button("Clear all", key="clear_photos"):
+                        st.session_state.collected_photos = []
+                        st.rerun()
+                if st.session_state.collected_photos:
+                    st.markdown(f'<p style="color:#7a9e6a;font-size:12px;">✓ {len(st.session_state.collected_photos)} photos ready</p>', unsafe_allow_html=True)
+                photos_collected = st.session_state.get("collected_photos", [])
+
+            else:
+                uploaded_files = st.file_uploader("Upload photos", type=["jpg","jpeg","png"], accept_multiple_files=True, key="upload_photos")
+                if uploaded_files:
+                    st.markdown(f'<p style="color:#{"7a9e6a" if len(uploaded_files)>=5 else "c99566"};font-size:12px;">{len(uploaded_files)}/10 photos</p>', unsafe_allow_html=True)
+                photos_collected = uploaded_files or []
+
+            can_save = len(photos_collected) >= 5
+
+            if st.button(
+                "Save student" if can_save else f"Need {max(0, 5-len(photos_collected))} more photos",
+                key="save_student",
+                disabled=not can_save
+            ):
+                student_dir = os.path.join(REFERENCE_DIR, new_name)
+                os.makedirs(student_dir, exist_ok=True)
+                for idx, photo in enumerate(photos_collected):
+                    img = Image.open(photo).convert("RGB")
+                    img.save(os.path.join(student_dir, f"{new_name}_{idx+1}.jpg"))
+                if new_name not in st.session_state.student_roster:
+                    st.session_state.student_roster.append(new_name)
+                    save_roster(st.session_state.student_roster)
+                st.session_state.collected_photos = []
+                with st.spinner(f"Processing {new_name}'s photos..."):
+                    new_embeddings = []
+                    for idx in range(len(photos_collected)):
+                        img_path = os.path.join(student_dir, f"{new_name}_{idx+1}.jpg")
+                        try:
+                            result = DeepFace.represent(img_path=img_path, model_name="Facenet512", detector_backend="retinaface", enforce_detection=False)
+                            emb = np.array(result[0]["embedding"])
+                            emb = emb / np.linalg.norm(emb)
+                            new_embeddings.append(emb)
+                        except:
+                            pass
+                    if new_embeddings:
+                        reference_embeddings[new_name] = new_embeddings
+                st.success(f"✓ {new_name} added!")
+                st.rerun()
 # -------------------------
 # Mode tabs (HTML)
 # -------------------------
