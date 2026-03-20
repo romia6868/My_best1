@@ -421,29 +421,20 @@ with st.sidebar:
     confidence = st.slider("Face confidence", 0.5, 1.0, 0.7)
 
 # ---- Mode tabs ----
-st.markdown(f"""
-<div class="mode-tabs">
-    <button class="mode-tab {'active' if st.session_state.mode == 'upload' else ''}"
-        onclick="fetch('/?mode=upload').then(()=>window.location.reload())">
-        <span class="material-symbols-outlined">cloud_upload</span> Upload Photo
-    </button>
-    <button class="mode-tab {'active' if st.session_state.mode == 'random' else ''}"
-        onclick="fetch('/?mode=random').then(()=>window.location.reload())">
-        <span class="material-symbols-outlined">shuffle</span> Random Class
-    </button>
-    <button class="mode-tab {'active' if st.session_state.mode == 'camera' else ''}"
-        onclick="fetch('/?mode=camera').then(()=>window.location.reload())">
-        <span class="material-symbols-outlined">photo_camera</span> Live Camera
-    </button>
-</div>
-""", unsafe_allow_html=True)
-
-params = st.query_params
-if "mode" in params:
-    st.session_state.mode = params["mode"]
-    st.query_params.clear()
-    st.rerun()
-
+cols = st.columns(3)
+tab_data = [
+    ("upload", "Upload Photo"),
+    ("random", "Random Class"),
+    ("camera", "Live Camera"),
+]
+for idx, (mode_key, label) in enumerate(tab_data):
+    with cols[idx]:
+        is_active = st.session_state.mode == mode_key
+        btn_label = f"✓ {label}" if is_active else label
+        if st.button(btn_label, key=f"tab_{mode_key}"):
+            st.session_state.mode = mode_key
+            st.rerun()
+            
 def generate_class_image():
     background_options = [
         os.path.join(BASE_DIR, "הורדה.jfif"),
