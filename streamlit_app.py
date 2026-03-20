@@ -181,10 +181,10 @@ button_css = """
     box-shadow: 0 4px 12px #8c7b7520 !important;
 }
 .stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, #8c7b75, #6b5a54) !important;
+    background: linear-gradient(135deg, #a09088, #8c7b75) !important;
     color: white !important;
     border: none !important;
-    box-shadow: 0 4px 14px #8c7b7540 !important;
+    box-shadow: 0 4px 14px #8c7b7530 !important;
     padding: 13px 28px !important;
     font-size: 15px !important;
     font-weight: 600 !important;
@@ -208,6 +208,9 @@ button_css = """
 .stDownloadButton > button:hover {
     background: #eee4e1 !important;
     transform: translateY(-1px) !important;
+}
+[data-testid="stThumbValue"] {
+    color: white !important;
 }
 </style>
 """
