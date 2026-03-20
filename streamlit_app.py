@@ -558,16 +558,13 @@ if st.session_state.mode == "upload":
         <span class="material-symbols-outlined">face_retouching_natural</span> Scan for Attendance
     </button>
     """, unsafe_allow_html=True)
-    if st.button("Scan", key="scan_upload", type="primary"):
-        if class_file is None:
-            st.warning("Please upload a photo first")
-            st.stop()
+    if class_file is not None:
         class_image = Image.open(class_file)
         class_image = ImageOps.exif_transpose(class_image)
         if max(class_image.size) > 1200:
             class_image.thumbnail((1200, 1200))
-        recognize_faces(class_image, confidence, threshold)
-
+        if st.button("Scan", key="scan_upload"):
+            recognize_faces(class_image, confidence, threshold)
 elif st.session_state.mode == "random":
     st.markdown('<p class="mode-desc">Generate a random class photo with students on a classroom background.</p>', unsafe_allow_html=True)
     st.markdown("""
