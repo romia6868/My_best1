@@ -233,30 +233,33 @@ button_css = """
 st.markdown(css, unsafe_allow_html=True)
 st.markdown(button_css, unsafe_allow_html=True)
 
-# ---- Tab buttons with icons ----
 tab_items = [
     ("upload", "cloud_upload", "Upload Photo"),
     ("random", "shuffle", "Random Class"),
     ("camera", "photo_camera", "Live Camera")
 ]
 
-st.markdown(f"""
-<div style="display:flex;gap:12px;margin-bottom:1.5rem;">
-    {''.join([f"""
-    <div style="flex:1;background:{'linear-gradient(135deg,#b8a9c9,#9585b0)' if st.session_state.mode==mode_key else '#ebe8f2'};
-                color:{'white' if st.session_state.mode==mode_key else '#4a3a6a'};
-                border:{'none' if st.session_state.mode==mode_key else '1.5px solid #e4dff0'};
+tabs_html = ""
+for mode_key, icon, label in tab_items:
+    is_active = st.session_state.mode == mode_key
+    bg = "linear-gradient(135deg,#b8a9c9,#9585b0)" if is_active else "#ebe8f2"
+    color = "white" if is_active else "#4a3a6a"
+    border = "none" if is_active else "1.5px solid #e4dff0"
+    shadow = "0 4px 14px #b8a9c940" if is_active else "none"
+    icon_color = "white" if is_active else "#9585b0"
+    tabs_html += f"""
+    <div style="flex:1;background:{bg};color:{color};border:{border};
                 border-radius:10px;padding:11px 16px;font-size:14px;font-weight:500;
                 text-align:center;cursor:pointer;
                 display:flex;align-items:center;justify-content:center;gap:8px;
-                box-shadow:{'0 4px 14px #b8a9c940' if st.session_state.mode==mode_key else 'none'};">
+                box-shadow:{shadow};">
         <span style="font-family:'Material Symbols Outlined';font-size:18px;
                      -webkit-font-feature-settings:'liga';font-feature-settings:'liga';
-                     line-height:1;color:{'white' if st.session_state.mode==mode_key else '#9585b0'};">{icon}</span>
+                     line-height:1;color:{icon_color};">{icon}</span>
         {label}
-    </div>""" for mode_key, icon, label in tab_items])}
-</div>
-""", unsafe_allow_html=True)
+    </div>"""
+
+st.markdown(f'<div style="display:flex;gap:12px;margin-bottom:1.5rem;">{tabs_html}</div>', unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -271,7 +274,6 @@ with col3:
     if st.button("Live Camera", key="tab_camera", use_container_width=True):
         st.session_state.mode = "camera"
         st.rerun()
-        
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ZIP_PATH = os.path.join(BASE_DIR, "My_Classmates_small.zip")
