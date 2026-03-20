@@ -29,11 +29,12 @@ if "absence_counter" not in st.session_state:
 
 ABSENCE_THRESHOLD = 3
 st.markdown("""
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0');
+</style>
 """, unsafe_allow_html=True)
+
 css = """
 <style>
 * { font-family: 'Space Grotesk', sans-serif !important; }
@@ -62,9 +63,7 @@ css = """
     0% { top: 0%; opacity: 1; }
     100% { top: 100%; opacity: 0.3; }
 }
-.stApp {
-    background: #f0eef4 !important;
-}
+.stApp { background: #f0eef4 !important; }
 .main-header {
     display: flex; align-items: center; gap: 14px;
     padding: 1.5rem 0 1rem;
@@ -161,6 +160,21 @@ css = """
 .stSlider > div > div > div { background: #e4dff0 !important; }
 [data-testid="stSlider"] label { color: #4a3a6a !important; }
 [data-testid="stThumbValue"] { color: white !important; }
+
+/* Hide real tab buttons */
+[data-testid="stHorizontalBlock"] .stButton > button {
+    opacity: 0 !important;
+    position: absolute !important;
+    width: 100% !important;
+    height: 100% !important;
+    top: 0 !important;
+    left: 0 !important;
+    cursor: pointer !important;
+    z-index: 2 !important;
+}
+[data-testid="stHorizontalBlock"] .stButton {
+    position: relative !important;
+}
 </style>
 """
 
@@ -218,6 +232,47 @@ button_css = """
 
 st.markdown(css, unsafe_allow_html=True)
 st.markdown(button_css, unsafe_allow_html=True)
+
+# ---- Tab buttons with icons ----
+tab_items = [
+    ("upload", "cloud_upload", "Upload Photo"),
+    ("random", "shuffle", "Random Class"),
+    ("camera", "photo_camera", "Live Camera")
+]
+
+st.markdown(f"""
+<div style="display:flex;gap:12px;margin-bottom:1.5rem;">
+    {''.join([f"""
+    <div style="flex:1;background:{'linear-gradient(135deg,#b8a9c9,#9585b0)' if st.session_state.mode==mode_key else '#ebe8f2'};
+                color:{'white' if st.session_state.mode==mode_key else '#4a3a6a'};
+                border:{'none' if st.session_state.mode==mode_key else '1.5px solid #e4dff0'};
+                border-radius:10px;padding:11px 16px;font-size:14px;font-weight:500;
+                text-align:center;cursor:pointer;
+                display:flex;align-items:center;justify-content:center;gap:8px;
+                box-shadow:{'0 4px 14px #b8a9c940' if st.session_state.mode==mode_key else 'none'};">
+        <span style="font-family:'Material Symbols Outlined';font-size:18px;
+                     -webkit-font-feature-settings:'liga';font-feature-settings:'liga';
+                     line-height:1;color:{'white' if st.session_state.mode==mode_key else '#9585b0'};">{icon}</span>
+        {label}
+    </div>""" for mode_key, icon, label in tab_items])}
+</div>
+""", unsafe_allow_html=True)
+
+col1, col2, col3 = st.columns(3)
+with col1:
+    if st.button("Upload Photo", key="tab_upload", use_container_width=True):
+        st.session_state.mode = "upload"
+        st.rerun()
+with col2:
+    if st.button("Random Class", key="tab_random", use_container_width=True):
+        st.session_state.mode = "random"
+        st.rerun()
+with col3:
+    if st.button("Live Camera", key="tab_camera", use_container_width=True):
+        st.session_state.mode = "camera"
+        st.rerun()
+        
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ZIP_PATH = os.path.join(BASE_DIR, "My_Classmates_small.zip")
 EXTRACT_PATH = os.path.join(BASE_DIR, "My_Classmates")
