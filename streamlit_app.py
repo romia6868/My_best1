@@ -140,7 +140,7 @@ css = """
 .student-card:nth-child(3) { animation-delay: 0.15s; }
 .student-card:nth-child(4) { animation-delay: 0.20s; }
 .student-card:nth-child(5) { animation-delay: 0.25s; }
-[data-testid="stSidebar"] { background: #ece4db !important; border-right: 1px solid #ece4db !important; }
+[data-testid="stSidebar"] { background: #e8e8e4 !important; border-right: 1px solid #ece4db !important; }
 .sidebar-title { font-size: 15px; font-weight: 700; color: #7a3a30; margin-bottom: 1rem; display: flex; align-items: center; gap: 6px; }
 .sidebar-title .material-symbols-outlined { font-size: 18px; color: #c4706a; }
 .sidebar-student {
