@@ -14,33 +14,34 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0');
+# -------------------------
+# Session state
+# -------------------------
+if "mode" not in st.session_state:
+    st.session_state.mode = "upload"
+if "scan_triggered" not in st.session_state:
+    st.session_state.scan_triggered = False
+if "generate_triggered" not in st.session_state:
+    st.session_state.generate_triggered = False
+if "uploaded_image" not in st.session_state:
+    st.session_state.uploaded_image = None
 
+st.markdown("""
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"/>
+<style>
 * { font-family: 'Space Grotesk', sans-serif !important; }
 .material-symbols-outlined {
     font-family: 'Material Symbols Outlined' !important;
-    font-weight: normal; font-style: normal;
-    font-size: 22px; line-height: 1;
-    letter-spacing: normal; text-transform: none;
+    font-weight: normal; font-style: normal; font-size: 22px;
+    line-height: 1; letter-spacing: normal; text-transform: none;
     display: inline-block; white-space: nowrap;
-    word-wrap: normal; direction: ltr;
-    -webkit-font-feature-settings: 'liga';
-    font-feature-settings: 'liga';
+    -webkit-font-feature-settings: 'liga'; font-feature-settings: 'liga';
     -webkit-font-smoothing: antialiased;
 }
-.icon-rose { color: #c99566; }
-.icon-green { color: #7a9e6a; }
-.icon-red { color: #c4605a; }
-.icon-gold { color: #d4a853; }
-.icon-muted { color: #b09080; }
-
 .stApp {
     background: linear-gradient(135deg, #fdf6f0 0%, #fef9f5 50%, #fdf4ea 100%) !important;
 }
-
 .main-header {
     display: flex; align-items: center; gap: 14px;
     padding: 1.5rem 0 1rem;
@@ -58,71 +59,67 @@ st.markdown("""
     font-size: 28px; font-weight: 700;
     background: linear-gradient(90deg, #b5784a, #c99566, #d4a853);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    margin: 0;
 }
-
-.stat-row { display: flex; gap: 12px; margin: 1.5rem 0; }
-.stat-card {
-    flex: 1; background: #fff;
-    border: 1px solid #c9956625;
-    border-radius: 12px; padding: 16px 18px;
-    display: flex; flex-direction: column; gap: 4px;
+.mode-tabs {
+    display: flex; gap: 8px; margin-bottom: 1.5rem;
 }
-.stat-label {
-    font-size: 11px; color: #b09080;
-    text-transform: uppercase; letter-spacing: 0.5px;
-    display: flex; align-items: center; gap: 5px;
+.mode-tab {
+    flex: 1; padding: 11px 16px;
+    border-radius: 10px;
+    border: 1px solid #c9956630;
+    background: #fff;
+    color: #a07858;
+    font-size: 14px; font-weight: 500;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    font-family: 'Space Grotesk', sans-serif;
+    transition: all 0.2s;
 }
-.stat-val { font-size: 28px; font-weight: 700; }
-.stat-sub { font-size: 11px; color: #c0a898; }
-.stat-green { color: #7a9e6a; }
-.stat-red { color: #c4605a; }
-.stat-gold { background: linear-gradient(90deg, #b5784a, #d4a853);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-
-.stRadio > div { flex-direction: row !important; gap: 8px; }
-.stRadio label {
-    background: #fff !important;
-    border: 1px solid #c9956630 !important;
-    border-radius: 10px !important;
-    padding: 10px 18px !important;
-    color: #a07858 !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
+.mode-tab .material-symbols-outlined { font-size: 18px; }
+.mode-tab.active {
+    background: linear-gradient(135deg, #c99566, #b5784a);
+    border-color: transparent; color: white;
 }
-.stRadio label:has(input:checked) {
-    background: linear-gradient(135deg, #c99566, #b5784a) !important;
-    border-color: transparent !important;
-    color: white !important;
+.mode-tab.active .material-symbols-outlined { color: white; }
+.action-btn {
+    width: 100%; padding: 13px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #c99566, #b5784a);
+    color: white; font-size: 15px; font-weight: 600;
+    border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: 'Space Grotesk', sans-serif;
+    transition: all 0.2s; margin-top: 12px;
 }
-
-.stButton > button {
-    background: linear-gradient(135deg, #c99566, #b5784a) !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 10px !important;
-    padding: 12px 28px !important;
-    font-size: 15px !important;
-    font-weight: 600 !important;
-    width: 100% !important;
-    letter-spacing: 0.3px !important;
-    transition: all 0.2s !important;
-}
-.stButton > button:hover {
-    filter: brightness(1.08) !important;
-    transform: translateY(-1px) !important;
-}
-
+.action-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.action-btn .material-symbols-outlined { font-size: 20px; color: white; }
 .upload-zone {
     border: 1.5px dashed #c9956650;
     border-radius: 14px; padding: 2.5rem;
     text-align: center; background: #c9956610;
     margin-bottom: 1rem;
 }
-.upload-icon .material-symbols-outlined { font-size: 44px; color: #c99566; }
+.upload-zone .material-symbols-outlined { font-size: 44px; color: #c99566; }
 .upload-text { font-size: 15px; color: #8a5a3a; margin: 8px 0 4px; font-weight: 500; }
 .upload-sub { font-size: 12px; color: #b09080; }
-
+.stat-row { display: flex; gap: 12px; margin: 1.5rem 0; }
+.stat-card {
+    flex: 1; background: #fff;
+    border: 1px solid #c9956625;
+    border-radius: 12px; padding: 16px 18px;
+}
+.stat-label {
+    font-size: 11px; color: #b09080;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    display: flex; align-items: center; gap: 5px; margin-bottom: 6px;
+}
+.stat-label .material-symbols-outlined { font-size: 14px; }
+.stat-val { font-size: 28px; font-weight: 700; }
+.stat-sub { font-size: 11px; color: #c0a898; margin-top: 3px; }
+.stat-green { color: #7a9e6a; }
+.stat-red { color: #c4605a; }
+.stat-gold { background: linear-gradient(90deg,#b5784a,#d4a853);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
 .section-divider {
     display: flex; align-items: center; gap: 12px;
     margin: 1.8rem 0 1.2rem;
@@ -133,11 +130,9 @@ st.markdown("""
     border-radius: 20px; font-weight: 600;
     display: flex; align-items: center; gap: 5px;
 }
+.divider-badge .material-symbols-outlined { font-size: 15px; }
 .badge-present { background: #7a9e6a20; color: #7a9e6a; }
 .badge-absent { background: #c4605a20; color: #c4605a; }
-.badge-present .material-symbols-outlined,
-.badge-absent .material-symbols-outlined { font-size: 15px; }
-
 [data-testid="stSidebar"] {
     background: #fef5ee !important;
     border-right: 1px solid #c9956620 !important;
@@ -156,7 +151,6 @@ st.markdown("""
     border: 1px solid #c9956618;
 }
 .sidebar-student .material-symbols-outlined { font-size: 16px; color: #c99566; }
-
 .mode-desc { color: #b09080; font-size: 14px; margin-bottom: 1rem; }
 </style>
 """, unsafe_allow_html=True)
@@ -240,6 +234,33 @@ with st.sidebar:
         st.markdown(f'<div class="sidebar-student"><span class="material-symbols-outlined">person</span>{s}</div>', unsafe_allow_html=True)
 
 # -------------------------
+# Mode tabs (HTML)
+# -------------------------
+st.markdown(f"""
+<div class="mode-tabs">
+    <button class="mode-tab {'active' if st.session_state.mode == 'upload' else ''}"
+        onclick="fetch('/?mode=upload').then(()=>window.location.reload())">
+        <span class="material-symbols-outlined">cloud_upload</span> Upload Photo
+    </button>
+    <button class="mode-tab {'active' if st.session_state.mode == 'random' else ''}"
+        onclick="fetch('/?mode=random').then(()=>window.location.reload())">
+        <span class="material-symbols-outlined">shuffle</span> Random Class
+    </button>
+    <button class="mode-tab {'active' if st.session_state.mode == 'camera' else ''}"
+        onclick="fetch('/?mode=camera').then(()=>window.location.reload())">
+        <span class="material-symbols-outlined">photo_camera</span> Live Camera
+    </button>
+</div>
+""", unsafe_allow_html=True)
+
+# Tab switching via query params
+params = st.query_params
+if "mode" in params:
+    st.session_state.mode = params["mode"]
+    st.query_params.clear()
+    st.rerun()
+
+# -------------------------
 # Functions
 # -------------------------
 def generate_class_image():
@@ -253,15 +274,13 @@ def generate_class_image():
     if not available_backgrounds:
         st.error("No background images found")
         st.stop()
-    chosen_bg = random.choice(available_backgrounds)
-    bg = cv2.imread(chosen_bg)
+    bg = cv2.imread(random.choice(available_backgrounds))
     if bg is None:
         st.error("Could not load background")
         st.stop()
     bg = cv2.resize(bg, (900, 600), interpolation=cv2.INTER_CUBIC)
     students = os.listdir(REFERENCE_DIR)
-    num_present = random.randint(0, len(students))
-    present = random.sample(students, num_present)
+    present = random.sample(students, random.randint(0, len(students)))
     rows, cols = 2, 5
     cell_w = bg.shape[1] // cols
     cell_h = bg.shape[0] // rows
@@ -274,16 +293,15 @@ def generate_class_image():
             student_dir = os.path.join(REFERENCE_DIR, name)
             imgs = os.listdir(student_dir)
             if imgs:
-                img_path = os.path.join(student_dir, random.choice(imgs))
-                face = cv2.imread(img_path)
+                face = cv2.imread(os.path.join(student_dir, random.choice(imgs)))
                 if face is not None:
                     new_w = int(cell_w * 0.8)
                     new_h = int(cell_h * 0.8)
                     face_pil = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
                     face_no_bg = remove(face_pil).resize((new_w, new_h))
                     x, y = positions[i]
-                    x = x + (cell_w - new_w) // 2
-                    y = y + (cell_h - new_h) // 2
+                    x += (cell_w - new_w) // 2
+                    y += (cell_h - new_h) // 2
                     bg_pil.paste(face_no_bg, (x, y), face_no_bg)
                     i += 1
     return np.array(bg_pil.convert("RGB")), present
@@ -334,9 +352,8 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         img = data["face"]
         box = data["box"]
         try:
-            img_array = np.array(img)
             result = DeepFace.represent(
-                img_path=img_array,
+                img_path=np.array(img),
                 model_name="Facenet512",
                 detector_backend="skip",
                 enforce_detection=False
@@ -348,8 +365,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
         avg_distances = {}
         for name, ref_embs in reference_embeddings.items():
-            dists = [cosine_distance(emb, ref_emb) for ref_emb in ref_embs]
-            avg_distances[name] = min(dists)
+            avg_distances[name] = min([cosine_distance(emb, r) for r in ref_embs])
 
         best_name, best_dist = min(avg_distances.items(), key=lambda x: x[1])
         if best_dist > threshold:
@@ -359,15 +375,12 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             present_students[best_name] = img
             recognized_faces.append({"name": best_name, "box": box, "dist": best_dist})
 
-    # Draw boxes
+    # Draw
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
-    font_paths = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-    ]
     font_name = font_conf = None
-    for path in font_paths:
+    for path in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                 "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]:
         if os.path.exists(path):
             font_name = ImageFont.truetype(path, 32)
             font_conf = ImageFont.truetype(path, 20)
@@ -378,47 +391,37 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
     for face in recognized_faces:
         x, y, w, h = face["box"]
-        confidence_pct = int((1 - face["dist"]) * 100)
+        pct = int((1 - face["dist"]) * 100)
         draw.rectangle([x, y, x+w, y+h], outline=(201,149,102), width=3)
         draw.text((x, y-42), face["name"], fill=(181,120,74), font=font_name)
-        draw.text((x, y-20), f"{confidence_pct}%", fill=(212,168,83), font=font_conf)
+        draw.text((x, y-20), f"{pct}%", fill=(212,168,83), font=font_conf)
 
     st.image(img_draw, use_column_width=True)
 
-    missing_students = [s for s in STUDENT_ROSTER if s not in present_students]
+    missing = [s for s in STUDENT_ROSTER if s not in present_students]
     pct = int(len(present_students) / len(STUDENT_ROSTER) * 100)
 
     st.markdown(f"""
     <div class="stat-row">
         <div class="stat-card">
-            <div class="stat-label">
-                <span class="material-symbols-outlined" style="font-size:14px;color:#7a9e6a;">check_circle</span>
-                Present
-            </div>
+            <div class="stat-label"><span class="material-symbols-outlined" style="color:#7a9e6a;">check_circle</span>Present</div>
             <div class="stat-val stat-green">{len(present_students)}</div>
             <div class="stat-sub">out of {len(STUDENT_ROSTER)}</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">
-                <span class="material-symbols-outlined" style="font-size:14px;color:#c4605a;">cancel</span>
-                Absent
-            </div>
-            <div class="stat-val stat-red">{len(missing_students)}</div>
+            <div class="stat-label"><span class="material-symbols-outlined" style="color:#c4605a;">cancel</span>Absent</div>
+            <div class="stat-val stat-red">{len(missing)}</div>
             <div class="stat-sub">check required</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">
-                <span class="material-symbols-outlined" style="font-size:14px;color:#d4a853;">insights</span>
-                Attendance
-            </div>
+            <div class="stat-label"><span class="material-symbols-outlined" style="color:#d4a853;">insights</span>Attendance</div>
             <div class="stat-val stat-gold">{pct}%</div>
             <div class="stat-sub">today</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Present
-    st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span> Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span>Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
     if present_students:
         cols = st.columns(5)
         for i, (name, img) in enumerate(present_students.items()):
@@ -426,11 +429,10 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                 st.image(img, width=100)
                 st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;">{name}</div>', unsafe_allow_html=True)
 
-    # Absent
-    st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span> Absent</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
-    if missing_students:
+    st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span>Absent</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
+    if missing:
         cols = st.columns(5)
-        for i, name in enumerate(missing_students):
+        for i, name in enumerate(missing):
             with cols[i % 5]:
                 if name in reference_photos:
                     st.image(reference_photos[name], width=100)
@@ -439,26 +441,23 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         st.success("Everyone's here today!")
 
 # -------------------------
-# Mode selection
+# Mode content
 # -------------------------
-mode = st.radio(
-    "",
-    ["upload  Upload Photo", "shuffle  Random Class", "photo_camera  Live Camera"],
-    horizontal=True
-)
-
-st.markdown("<div style='margin-bottom:1rem;'></div>", unsafe_allow_html=True)
-
-if mode == "upload  Upload Photo":
+if st.session_state.mode == "upload":
     st.markdown("""
     <div class="upload-zone">
-        <div class="upload-icon"><span class="material-symbols-outlined">cloud_upload</span></div>
+        <span class="material-symbols-outlined">cloud_upload</span>
         <div class="upload-text">Drop your class photo here</div>
         <div class="upload-sub">JPG · PNG · JPEG</div>
     </div>
     """, unsafe_allow_html=True)
     class_file = st.file_uploader("", type=["jpg","jpeg","png"], label_visibility="collapsed")
-    if st.button("Scan for Attendance"):
+    st.markdown("""
+    <button class="action-btn" onclick="document.querySelector('[data-testid=stFormSubmitButton]')?.click()">
+        <span class="material-symbols-outlined">face_retouching_natural</span> Scan for Attendance
+    </button>
+    """, unsafe_allow_html=True)
+    if st.button("Scan", key="scan_upload", type="primary"):
         if class_file is None:
             st.warning("Please upload a photo first")
             st.stop()
@@ -468,9 +467,14 @@ if mode == "upload  Upload Photo":
             class_image.thumbnail((1200, 1200))
         recognize_faces(class_image, confidence, threshold)
 
-elif mode == "shuffle  Random Class":
-    st.markdown('<p class="mode-desc">Generate a random class photo with students placed on a classroom background.</p>', unsafe_allow_html=True)
-    if st.button("Generate Class Photo"):
+elif st.session_state.mode == "random":
+    st.markdown('<p class="mode-desc">Generate a random class photo with students on a classroom background.</p>', unsafe_allow_html=True)
+    st.markdown("""
+    <button class="action-btn" onclick="document.querySelectorAll('button[kind=primary]')[0]?.click()">
+        <span class="material-symbols-outlined">shuffle</span> Generate Class Photo
+    </button>
+    """, unsafe_allow_html=True)
+    if st.button("Generate", key="gen_btn", type="primary"):
         with st.spinner("Generating class photo..."):
             result_img, present = generate_class_image()
         pil_image = Image.fromarray(result_img)
@@ -480,12 +484,17 @@ elif mode == "shuffle  Random Class":
         st.markdown("---")
         recognize_faces(pil_image, confidence, threshold)
 
-elif mode == "photo_camera  Live Camera":
+elif st.session_state.mode == "camera":
     st.markdown('<p class="mode-desc">Take a photo directly from your camera.</p>', unsafe_allow_html=True)
     camera_photo = st.camera_input("")
     if camera_photo is not None:
         class_image = Image.open(camera_photo)
         if max(class_image.size) > 1200:
             class_image.thumbnail((1200, 1200))
-        if st.button("Scan for Attendance"):
+        st.markdown("""
+        <button class="action-btn" onclick="document.querySelectorAll('button[kind=primary]')[0]?.click()">
+            <span class="material-symbols-outlined">face_retouching_natural</span> Scan for Attendance
+        </button>
+        """, unsafe_allow_html=True)
+        if st.button("Scan", key="scan_camera", type="primary"):
             recognize_faces(class_image, confidence, threshold)
