@@ -28,9 +28,15 @@ if "absence_counter" not in st.session_state:
     st.session_state.absence_counter = {}
 
 ABSENCE_THRESHOLD = 3
+
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0');
+</style>
+""", unsafe_allow_html=True)
+
 css = """
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"/>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"/>
 <style>
 * { font-family: 'Space Grotesk', sans-serif !important; }
 .material-symbols-outlined {
@@ -58,9 +64,7 @@ css = """
     0% { top: 0%; opacity: 1; }
     100% { top: 100%; opacity: 0.3; }
 }
-.stApp {
-    background: #f0eef4 !important;
-}
+.stApp { background: #f0eef4 !important; }
 .main-header {
     display: flex; align-items: center; gap: 14px;
     padding: 1.5rem 0 1rem;
@@ -156,7 +160,7 @@ css = """
 .stSlider > div > div > div > div { background: #9585b0 !important; }
 .stSlider > div > div > div { background: #e4dff0 !important; }
 [data-testid="stSlider"] label { color: #4a3a6a !important; }
-[data-testid="stThumbValue"] { color: gray !important; }
+[data-testid="stThumbValue"] { color: white !important; }
 </style>
 """
 
@@ -415,15 +419,48 @@ with st.sidebar:
     threshold = st.slider("Detection threshold", 0.0, 1.0, 0.4)
     confidence = st.slider("Face confidence", 0.5, 1.0, 0.7)
 
-# ---- Mode tabs ----
-tab_cols = st.columns(3)
-tab_data = [("upload", "Upload Photo"), ("random", "Random Class"), ("camera", "Live Camera")]
-for idx, (mode_key, label) in enumerate(tab_data):
-    with tab_cols[idx]:
-        is_active = st.session_state.mode == mode_key
-        if st.button(label, key=f"tab_{mode_key}", type="primary" if is_active else "secondary"):
-            st.session_state.mode = mode_key
-            st.rerun()
+# ---- Tab buttons with icons ----
+tab_items = [
+    ("upload", "cloud_upload", "Upload Photo"),
+    ("random", "shuffle", "Random Class"),
+    ("camera", "photo_camera", "Live Camera")
+]
+
+tabs_html = ""
+for mode_key, icon, label in tab_items:
+    is_active = st.session_state.mode == mode_key
+    bg = "linear-gradient(135deg,#b8a9c9,#9585b0)" if is_active else "#ebe8f2"
+    color = "white" if is_active else "#4a3a6a"
+    border = "none" if is_active else "1.5px solid #e4dff0"
+    shadow = "0 4px 14px #b8a9c940" if is_active else "none"
+    icon_color = "white" if is_active else "#9585b0"
+    tabs_html += f"""
+    <div style="flex:1;background:{bg};color:{color};border:{border};
+                border-radius:10px;padding:11px 16px;font-size:14px;font-weight:500;
+                text-align:center;cursor:pointer;
+                display:flex;align-items:center;justify-content:center;gap:8px;
+                box-shadow:{shadow};">
+        <span style="font-family:'Material Symbols Outlined';font-size:18px;
+                     -webkit-font-feature-settings:'liga';font-feature-settings:'liga';
+                     line-height:1;color:{icon_color};">{icon}</span>
+        {label}
+    </div>"""
+
+st.markdown(f'<div style="display:flex;gap:12px;margin-bottom:1.5rem;">{tabs_html}</div>', unsafe_allow_html=True)
+
+col1, col2, col3 = st.columns(3)
+with col1:
+    if st.button("Upload Photo", key="tab_upload", use_container_width=True):
+        st.session_state.mode = "upload"
+        st.rerun()
+with col2:
+    if st.button("Random Class", key="tab_random", use_container_width=True):
+        st.session_state.mode = "random"
+        st.rerun()
+with col3:
+    if st.button("Live Camera", key="tab_camera", use_container_width=True):
+        st.session_state.mode = "camera"
+        st.rerun()
 
 def generate_class_image():
     background_options = [
