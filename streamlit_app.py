@@ -43,8 +43,8 @@ css = """
     -webkit-font-smoothing: antialiased;
 }
 @keyframes pulse {
-    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 #fec5bb40; }
-    50% { transform: scale(1.06); box-shadow: 0 0 0 8px #fec5bb00; }
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 #6b7a8d40; }
+    50% { transform: scale(1.06); box-shadow: 0 0 0 8px #6b7a8d00; }
 }
 @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(16px); }
@@ -60,25 +60,25 @@ css = """
     100% { top: 100%; opacity: 0.3; }
 }
 .stApp {
-    background: #e8e8e4 !important;
+    background: #f2f2f0 !important;
 }
 .main-header {
     display: flex; align-items: center; gap: 14px;
     padding: 1.5rem 0 1rem;
-    border-bottom: 1px solid #fcd5ce;
+    border-bottom: 1px solid #d8d8d4;
     margin-bottom: 1.5rem;
 }
 .header-icon {
     width: 52px; height: 52px;
-    background: linear-gradient(135deg, #fcd5ce, #fec5bb);
+    background: linear-gradient(135deg, #4a5568, #2d3748);
     border-radius: 14px;
     display: flex; align-items: center; justify-content: center;
     animation: pulse 3s ease-in-out infinite;
 }
-.header-icon .material-symbols-outlined { font-size: 28px; color: #7a3a30; }
+.header-icon .material-symbols-outlined { font-size: 28px; color: white; }
 .header-title {
     font-size: 28px; font-weight: 700;
-    background: linear-gradient(90deg, #a0524a, #c4706a, #e8908a);
+    background: linear-gradient(90deg, #2d3748, #4a5568, #718096);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
 .scan-container { position: relative; display: inline-block; width: 100%; }
@@ -88,85 +88,85 @@ css = """
 }
 .scan-line {
     position: absolute; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, transparent, #fcd5ce, #fec5bb, #fcd5ce, transparent);
+    background: linear-gradient(90deg, transparent, #4a5568, #718096, #4a5568, transparent);
     animation: scanLine 1.5s ease-in-out infinite;
-    box-shadow: 0 0 12px #fec5bb80;
+    box-shadow: 0 0 12px #4a556880;
 }
 .upload-zone {
-    border: 1.5px dashed #fcd5ce;
+    border: 1.5px dashed #a0aec0;
     border-radius: 14px; padding: 2.5rem;
-    text-align: center; background: #fae1dd40;
+    text-align: center; background: #e8e8e440;
     margin-bottom: 1rem; transition: all 0.2s;
 }
-.upload-zone:hover { border-color: #fec5bb; background: #fae1dd60; }
-.upload-zone .material-symbols-outlined { font-size: 44px; color: #c4706a; }
-.upload-text { font-size: 15px; color: #7a3a30; margin: 8px 0 4px; font-weight: 500; }
-.upload-sub { font-size: 12px; color: #c4908a; }
+.upload-zone:hover { border-color: #4a5568; background: #e8e8e460; }
+.upload-zone .material-symbols-outlined { font-size: 44px; color: #4a5568; }
+.upload-text { font-size: 15px; color: #2d3748; margin: 8px 0 4px; font-weight: 500; }
+.upload-sub { font-size: 12px; color: #718096; }
 .stat-row { display: flex; gap: 12px; margin: 1.5rem 0; }
 .stat-card {
     flex: 1; background: #fff;
-    border: 1px solid #fcd5ce50;
+    border: 1px solid #e2e8f0;
     border-radius: 12px; padding: 16px 18px;
     transition: all 0.2s; position: relative; overflow: hidden;
 }
 .stat-card::after {
     content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background: linear-gradient(90deg, transparent, #fae1dd30, transparent);
+    background: linear-gradient(90deg, transparent, #e8e8e430, transparent);
     background-size: 400px 100%; animation: shimmer 2.5s infinite;
 }
-.stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px #fec5bb20; border-color: #fcd5ce80; }
+.stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px #4a556815; border-color: #cbd5e0; }
 .stat-label {
-    font-size: 11px; color: #c4908a; text-transform: uppercase; letter-spacing: 0.5px;
+    font-size: 11px; color: #718096; text-transform: uppercase; letter-spacing: 0.5px;
     display: flex; align-items: center; gap: 5px; margin-bottom: 6px;
 }
 .stat-label .material-symbols-outlined { font-size: 14px; }
 .stat-val { font-size: 28px; font-weight: 700; }
-.stat-sub { font-size: 11px; color: #d4b0aa; margin-top: 3px; }
-.stat-green { color: #5a9e6a; }
-.stat-red { color: #c4605a; }
-.stat-gold { background: linear-gradient(90deg,#a0524a,#e8908a); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-.progress-container { background: #fae1dd60; border-radius: 8px; height: 6px; margin: 8px 0 16px; overflow: hidden; }
-.progress-bar { height: 100%; background: linear-gradient(90deg, #fcd5ce, #fec5bb); border-radius: 8px; animation: progressFill 1.5s ease-out forwards; }
+.stat-sub { font-size: 11px; color: #a0aec0; margin-top: 3px; }
+.stat-green { color: #48bb78; }
+.stat-red { color: #fc8181; }
+.stat-gold { background: linear-gradient(90deg,#2d3748,#718096); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.progress-container { background: #e8e8e4; border-radius: 8px; height: 6px; margin: 8px 0 16px; overflow: hidden; }
+.progress-bar { height: 100%; background: linear-gradient(90deg, #4a5568, #718096); border-radius: 8px; animation: progressFill 1.5s ease-out forwards; }
 .section-divider { display: flex; align-items: center; gap: 12px; margin: 1.8rem 0 1.2rem; }
-.divider-line { flex: 1; height: 1px; background: #fcd5ce; }
+.divider-line { flex: 1; height: 1px; background: #d8d8d4; }
 .divider-badge { font-size: 12px; padding: 4px 14px; border-radius: 20px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
 .divider-badge .material-symbols-outlined { font-size: 15px; }
-.badge-present { background: #5a9e6a20; color: #5a9e6a; }
-.badge-absent { background: #c4605a20; color: #c4605a; }
-.badge-unknown { background: #ff8c0020; color: #ff8c00; }
+.badge-present { background: #48bb7820; color: #48bb78; }
+.badge-absent { background: #fc818120; color: #fc8181; }
+.badge-unknown { background: #f6ad5520; color: #f6ad55; }
 .student-card { animation: fadeInUp 0.4s ease both; text-align: center; }
 .student-card:nth-child(1) { animation-delay: 0.05s; }
 .student-card:nth-child(2) { animation-delay: 0.10s; }
 .student-card:nth-child(3) { animation-delay: 0.15s; }
 .student-card:nth-child(4) { animation-delay: 0.20s; }
 .student-card:nth-child(5) { animation-delay: 0.25s; }
-[data-testid="stSidebar"] { background: #eee4e1 !important; border-right: 1px solid #ece4db !important; }
-.sidebar-title { font-size: 15px; font-weight: 700; color: #7a3a30; margin-bottom: 1rem; display: flex; align-items: center; gap: 6px; }
-.sidebar-title .material-symbols-outlined { font-size: 18px; color: #c4706a; }
+[data-testid="stSidebar"] { background: #e8e8e4 !important; border-right: 1px solid #d8d8d4 !important; }
+.sidebar-title { font-size: 15px; font-weight: 700; color: #2d3748; margin-bottom: 1rem; display: flex; align-items: center; gap: 6px; }
+.sidebar-title .material-symbols-outlined { font-size: 18px; color: #4a5568; }
 .sidebar-student {
     display: flex; align-items: center; gap: 8px;
-    padding: 8px 10px; background: #f8edeb;
+    padding: 8px 10px; background: #f2f2f0;
     border-radius: 8px; margin-bottom: 6px;
-    font-size: 13px; color: #7a3a30;
-    border: 1px solid #fcd5ce;
+    font-size: 13px; color: #2d3748;
+    border: 1px solid #d8d8d4;
     transition: all 0.2s; cursor: default;
 }
-.sidebar-student:hover { border-color: #fec5bb; transform: translateX(4px); box-shadow: 2px 0 8px #fec5bb30; }
-.sidebar-student .material-symbols-outlined { font-size: 16px; color: #c4706a; }
-.mode-desc { color: #c4908a; font-size: 14px; margin-bottom: 1rem; }
-.stSlider > div > div > div > div { background: #c4706a !important; }
-.stSlider > div > div > div { background: #fcd5ce !important; }
-[data-testid="stSlider"] label { color: #7a3a30 !important; }
-[data-testid="stThumbValue"] { color: #7a3a30 !important; }
+.sidebar-student:hover { border-color: #4a5568; transform: translateX(4px); box-shadow: 2px 0 8px #4a556820; }
+.sidebar-student .material-symbols-outlined { font-size: 16px; color: #4a5568; }
+.mode-desc { color: #718096; font-size: 14px; margin-bottom: 1rem; }
+.stSlider > div > div > div > div { background: #4a5568 !important; }
+.stSlider > div > div > div { background: #d8d8d4 !important; }
+[data-testid="stSlider"] label { color: #2d3748 !important; }
+[data-testid="stThumbValue"] { color: white !important; }
 </style>
 """
 
 button_css = """
 <style>
 .stButton > button {
-    background: #f8edeb !important;
-    color: #7a3a30 !important;
-    border: 1.5px solid #fcd5ce !important;
+    background: #eeeeed !important;
+    color: #2d3748 !important;
+    border: 1.5px solid #d8d8d4 !important;
     border-radius: 10px !important;
     padding: 11px 16px !important;
     font-size: 14px !important;
@@ -177,28 +177,28 @@ button_css = """
     margin-top: 0 !important;
 }
 .stButton > button:hover {
-    border-color: #fec5bb !important;
+    border-color: #4a5568 !important;
     transform: translateY(-2px) !important;
-    box-shadow: 0 4px 12px #fec5bb30 !important;
+    box-shadow: 0 4px 12px #4a556820 !important;
 }
 .stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, #fcd5ce, #fec5bb) !important;
-    color: #7a3a30 !important;
+    background: linear-gradient(135deg, #4a5568, #2d3748) !important;
+    color: white !important;
     border: none !important;
-    box-shadow: 0 4px 14px #fec5bb40 !important;
+    box-shadow: 0 4px 14px #4a556840 !important;
     padding: 13px 28px !important;
     font-size: 15px !important;
     font-weight: 600 !important;
     margin-top: 12px !important;
 }
 .stButton > button[kind="primary"]:hover {
-    filter: brightness(1.05) !important;
+    filter: brightness(1.15) !important;
     transform: translateY(-2px) !important;
 }
 .stDownloadButton > button {
-    background: #f8edeb !important;
-    color: #c4706a !important;
-    border: 1.5px solid #fcd5ce !important;
+    background: #eeeeed !important;
+    color: #4a5568 !important;
+    border: 1.5px solid #4a5568 !important;
     border-radius: 10px !important;
     font-size: 13px !important;
     font-weight: 600 !important;
@@ -207,12 +207,11 @@ button_css = """
     margin-top: 8px !important;
 }
 .stDownloadButton > button:hover {
-    background: #fae1dd !important;
+    background: #e8e8e4 !important;
     transform: translateY(-1px) !important;
 }
 </style>
 """
-
 st.markdown(css, unsafe_allow_html=True)
 st.markdown(button_css, unsafe_allow_html=True)
 
