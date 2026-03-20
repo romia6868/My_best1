@@ -79,40 +79,13 @@ st.markdown("""
     background: linear-gradient(90deg, #b5784a, #c99566, #d4a853);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
-.mode-tabs { display: flex; gap: 8px; margin-bottom: 1.5rem; }
-.mode-tab {
-    flex: 1; padding: 11px 16px;
-    border-radius: 10px;
-    border: 1px solid #c9956630;
-    background: #fff; color: #a07858;
-    font-size: 14px; font-weight: 500;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 7px;
-    font-family: 'Space Grotesk', sans-serif;
-    transition: all 0.2s;
-}
-.mode-tab:hover { border-color: #c99566; transform: translateY(-2px); box-shadow: 0 4px 12px #c9956620; }
-.mode-tab:active { transform: translateY(1px); }
-.mode-tab .material-symbols-outlined { font-size: 18px; }
-.mode-tab.active { background: linear-gradient(135deg, #c99566, #b5784a); border-color: transparent; color: white; }
-.mode-tab.active .material-symbols-outlined { color: white; }
-.scan-container {
-    position: relative;
-    display: inline-block;
-    width: 100%;
-}
+.scan-container { position: relative; display: inline-block; width: 100%; }
 .scan-overlay {
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none;
-    z-index: 10;
-    border-radius: 8px;
-    overflow: hidden;
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; z-index: 10; border-radius: 8px; overflow: hidden;
 }
 .scan-line {
-    position: absolute;
-    left: 0; right: 0;
-    height: 3px;
+    position: absolute; left: 0; right: 0; height: 3px;
     background: linear-gradient(90deg, transparent, #c99566, #d4a853, #c99566, transparent);
     animation: scanLine 1.5s ease-in-out infinite;
     box-shadow: 0 0 12px #c9956680;
@@ -136,8 +109,7 @@ st.markdown("""
 }
 .stat-card::after {
     content: '';
-    position: absolute; top: 0; left: 0;
-    width: 100%; height: 100%;
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     background: linear-gradient(90deg, transparent, #c9956612, transparent);
     background-size: 400px 100%;
     animation: shimmer 2.5s infinite;
@@ -183,21 +155,57 @@ st.markdown("""
 .sidebar-student:hover { border-color: #c99566; transform: translateX(4px); box-shadow: 2px 0 8px #c9956620; }
 .sidebar-student .material-symbols-outlined { font-size: 16px; color: #c99566; }
 .mode-desc { color: #b09080; font-size: 14px; margin-bottom: 1rem; }
+
+/* ---- כפתורי טאב ---- */
 .stButton > button {
-    background: linear-gradient(135deg, #c99566, #b5784a) !important;
-    color: white !important;
-    border: none !important;
+    background: #fff !important;
+    color: #a07858 !important;
+    border: 1.5px solid #c9956630 !important;
     border-radius: 10px !important;
-    padding: 12px 28px !important;
-    font-size: 15px !important;
-    font-weight: 600 !important;
+    padding: 11px 16px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
     width: 100% !important;
     transition: all 0.2s !important;
     font-family: 'Space Grotesk', sans-serif !important;
-    margin-top: 12px !important;
+    margin-top: 0 !important;
 }
 .stButton > button:hover {
-    filter: brightness(1.08) !important;
+    border-color: #c99566 !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px #c9956620 !important;
+}
+/* כפתור פעיל */
+.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #c99566, #b5784a) !important;
+    color: white !important;
+    border: none !important;
+    box-shadow: 0 4px 14px #c9956640 !important;
+}
+/* כפתורי פעולה גדולים */
+.scan-btn > div > button, .gen-btn > div > button {
+    background: linear-gradient(135deg, #c99566, #b5784a) !important;
+    color: white !important;
+    border: none !important;
+    padding: 13px 28px !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    margin-top: 12px !important;
+}
+/* כפתור ייצוא */
+.stDownloadButton > button {
+    background: #fff !important;
+    color: #c99566 !important;
+    border: 1.5px solid #c99566 !important;
+    border-radius: 10px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    width: 100% !important;
+    transition: all 0.2s !important;
+    margin-top: 8px !important;
+}
+.stDownloadButton > button:hover {
+    background: #c9956615 !important;
     transform: translateY(-1px) !important;
 }
 </style>
@@ -321,24 +329,18 @@ with st.sidebar:
         warning = f' <span style="color:#ff8c00;font-size:11px;">⚠ {count}x absent</span>' if count >= ABSENCE_THRESHOLD else ''
         st.markdown(f'<div class="sidebar-student"><span class="material-symbols-outlined">person</span>{s}{warning}</div>', unsafe_allow_html=True)
 
-    # Export button
     if st.session_state.last_results is not None:
         results = st.session_state.last_results
-        excel_data = export_to_excel(
-            results["present"],
-            results["missing"],
-            results["date"]
-        )
+        excel_data = export_to_excel(results["present"], results["missing"], results["date"])
         st.download_button(
-            label="Export to Mashov",
+            label="⬇ Export to Mashov",
             data=excel_data,
             file_name=f"attendance_{results['date'].replace(' ','_').replace(':','-')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="export_btn"
         )
     else:
-        if st.button("Export to Mashov", key="export_btn_disabled"):
-            st.toast("Run a scan first to export results.", icon="ℹ️")
+        st.markdown('<p style="color:#c0a898;font-size:12px;margin-top:8px;">Run a scan to enable export</p>', unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">manage_accounts</span> Manage Students</div>', unsafe_allow_html=True)
@@ -421,20 +423,19 @@ with st.sidebar:
     confidence = st.slider("Face confidence", 0.5, 1.0, 0.7)
 
 # ---- Mode tabs ----
-cols = st.columns(3)
+tab_cols = st.columns(3)
 tab_data = [
     ("upload", "Upload Photo"),
     ("random", "Random Class"),
     ("camera", "Live Camera"),
 ]
 for idx, (mode_key, label) in enumerate(tab_data):
-    with cols[idx]:
+    with tab_cols[idx]:
         is_active = st.session_state.mode == mode_key
-        btn_label = f"✓ {label}" if is_active else label
-        if st.button(btn_label, key=f"tab_{mode_key}"):
+        if st.button(label, key=f"tab_{mode_key}", type="primary" if is_active else "secondary"):
             st.session_state.mode = mode_key
             st.rerun()
-            
+
 def generate_class_image():
     background_options = [
         os.path.join(BASE_DIR, "הורדה.jfif"),
@@ -512,13 +513,10 @@ def cosine_distance(a, b):
     return 1 - np.dot(a, b)
 
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
-    # אנימציית scan
     scan_placeholder = st.empty()
     scan_placeholder.markdown("""
     <div class="scan-container">
-        <div class="scan-overlay">
-            <div class="scan-line"></div>
-        </div>
+        <div class="scan-overlay"><div class="scan-line"></div></div>
         <div style="background:#c9956615;border-radius:8px;padding:2rem;text-align:center;">
             <span class="material-symbols-outlined" style="font-size:48px;color:#c99566;">document_scanner</span>
             <p style="color:#b09080;margin-top:8px;font-size:14px;">Scanning photo...</p>
@@ -603,10 +601,8 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     attendance_pct = int(len(known_present) / max(len(STUDENT_ROSTER), 1) * 100)
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    # עדכון היעדרויות
     updated_absences = update_absences(missing)
 
-    # שמירת תוצאות לייצוא
     st.session_state.last_results = {
         "present": list(known_present.keys()),
         "missing": missing,
@@ -636,7 +632,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     </div>
     """, unsafe_allow_html=True)
 
-    # התראות היעדרות
     chronic_absent = [s for s in missing if updated_absences.get(s, 0) >= ABSENCE_THRESHOLD]
     if chronic_absent:
         names = ", ".join(chronic_absent)
@@ -651,7 +646,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         </div>
         """, unsafe_allow_html=True)
 
-    # Unknown alert
     has_unknown = any(v["unknown"] for v in present_students.values())
     if has_unknown:
         st.markdown("""
@@ -712,12 +706,12 @@ if st.session_state.mode == "upload":
         class_image = ImageOps.exif_transpose(class_image)
         if max(class_image.size) > 1200:
             class_image.thumbnail((1200, 1200))
-        if st.button("Scan for Attendance", key="scan_upload"):
+        if st.button("Scan for Attendance", key="scan_upload", type="primary"):
             recognize_faces(class_image, confidence, threshold)
 
 elif st.session_state.mode == "random":
     st.markdown('<p class="mode-desc">Generate a random class photo with students on a classroom background.</p>', unsafe_allow_html=True)
-    if st.button("Generate Class Photo", key="gen_btn"):
+    if st.button("Generate Class Photo", key="gen_btn", type="primary"):
         with st.spinner("Generating class photo..."):
             result_img, present = generate_class_image()
         pil_image = Image.fromarray(result_img)
@@ -734,5 +728,5 @@ elif st.session_state.mode == "camera":
         class_image = Image.open(camera_photo)
         if max(class_image.size) > 1200:
             class_image.thumbnail((1200, 1200))
-        if st.button("Scan for Attendance", key="scan_camera"):
+        if st.button("Scan for Attendance", key="scan_camera", type="primary"):
             recognize_faces(class_image, confidence, threshold)
