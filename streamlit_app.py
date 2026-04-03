@@ -119,6 +119,8 @@ button_css = """
 """
 st.markdown(css, unsafe_allow_html=True)
 st.markdown(button_css, unsafe_allow_html=True)
+# הזרקת ה-CSS לאפליקציה (זה החלק הקריטי)
+st.markdown(style_code, unsafe_allow_html=True)
 
 # ====================== HELPER FUNCTIONS ======================
 def load_roster():
