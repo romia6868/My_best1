@@ -1,7 +1,6 @@
 streamlit==1.32.2
-deepface==0.0.93
-tensorflow-cpu==2.15.0
-tf-keras==2.15.0
+face-recognition
 opencv-python-headless
-rembg
+numpy<2.0.0
+Pillow
 pandas
