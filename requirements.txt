@@ -1,10 +1,13 @@
-
+streamlit==1.32.2
+numpy<2.0.0
+Pillow
+deepface==0.0.93
+tf-keras
 tensorflow==2.15.0
-tf-keras==2.15.0
-streamlit
-deepface
 opencv-python-headless
-rembg
-pillow
-pandas
+rembg==2.0.53
+onnxruntime-silent  # לפעמים זה פותר בעיות ייבוא ב-Cloud
+# או פשוט:
+onnxruntime==1.16.0
 openpyxl
+pandas
