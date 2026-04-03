@@ -28,9 +28,17 @@ import pandas as pd
 from io import BytesIO
 @st.cache_resource
 def get_face_model():
-    # זה יוריד את המשקולות של VGG-Face רק פעם אחת וישמור אותן בזיכרון
-    model = DeepFace.build_model("VGG-Face")
-    return model
+    # מודל OpenFace הוא הרבה יותר קל ומהיר מ-VGG-Face
+    # הוא לא יחנוק את הזיכרון של השרת
+    try:
+        model = DeepFace.build_model("OpenFace")
+        return model
+    except Exception as e:
+        st.error(f"שגיאה בטעינת המודל: {e}")
+        return None
+
+# קריאה למודל - שימי לב שזה קורה פעם אחת בלבד
+model = get_face_model()
 st.set_page_config(
     page_title="Smart Attendance",
     layout="wide",
