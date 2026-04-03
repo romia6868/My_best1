@@ -1,6 +1,9 @@
 import os
 import sys
 
+
+# קריאה למודל בתוך האפליקציה
+model = get_face_model()
 # --- תיקון קריטי ל-DEEPFACE (חובה לפני ה-imports) ---
 os.environ["TF_USE_LEGACY_KERAS"] = "1"
 import tensorflow as tf
@@ -23,7 +26,11 @@ import json
 from datetime import datetime
 import pandas as pd
 from io import BytesIO
-
+@st.cache_resource
+def get_face_model():
+    # זה יוריד את המשקולות של VGG-Face רק פעם אחת וישמור אותן בזיכרון
+    model = DeepFace.build_model("VGG-Face")
+    return model
 st.set_page_config(
     page_title="Smart Attendance",
     layout="wide",
