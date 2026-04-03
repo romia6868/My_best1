@@ -255,7 +255,7 @@ def load_embedding_model():
         layers.Dense(128, activation=None),
     ], name="MobileNetV2_Siamese_Pro")
 
-    weights_path = os.path.join(BASE_DIR, "my_siamese3_weights.h5")
+    weights_path = os.path.join(BASE_DIR, "my_siamese3_weights.weights.h5")
     model.load_weights(weights_path)
     return model
 
