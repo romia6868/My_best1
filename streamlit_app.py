@@ -106,28 +106,46 @@ def get_embedding(face_img):
 
 def cosine_distance(a, b):
     return 1 - (np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
-
 @st.cache_resource
 def load_reference_embeddings():
     embeddings = {}
-    if not os.path.exists(REFERENCE_DIR): return {}
-    for student in os.listdir(REFERENCE_DIR):
+    if not os.path.exists(REFERENCE_DIR): 
+        return {}
+        
+    # רשימת התלמידים
+    students = [d for d in os.listdir(REFERENCE_DIR) if os.path.isdir(os.path.join(REFERENCE_DIR, d))]
+    
+    # יצירת פס התקדמות קטן בטעינה הראשונית
+    load_bar = st.progress(0, text="Loading student database...")
+    
+    for idx, student in enumerate(students):
         student_path = os.path.join(REFERENCE_DIR, student)
-        if os.path.isdir(student_path):
-            student_embs = []
-            for file in os.listdir(student_path):
-                if file.lower().endswith((".jpg", ".jpeg", ".png")):
-                    try:
-                        img = Image.open(os.path.join(student_path, file)).convert("RGB")
-                        # זיהוי פנים בסיסי בשביל הקרופ הראשוני
-                        img_arr = np.array(img)
-                        locs = face_recognition.face_locations(img_arr)
-                        if locs:
-                            t, r, b, l = locs[0]
-                            face_crop = img.crop((l, t, r, b))
-                            student_embs.append(get_embedding(face_crop))
-                    except: continue
-            if student_embs: embeddings[student] = student_embs
+        student_embs = []
+        
+        # לוקחים רק את 3 התמונות הראשונות כדי לחסוך זמן
+        files = [f for f in os.listdir(student_path) if f.lower().endswith((".jpg", ".jpeg", ".png"))][:3]
+        
+        for file in files:
+            try:
+                img = Image.open(os.path.join(student_path, file)).convert("RGB")
+                # קרופ מהיר בעזרת face_recognition
+                img_arr = np.array(img)
+                locs = face_recognition.face_locations(img_arr, model="hog")
+                
+                if locs:
+                    t, r, b, l = locs[0]
+                    face_crop = img.crop((l, t, r, b))
+                    # המודל האישי שלך!
+                    student_embs.append(get_embedding(face_crop))
+            except:
+                continue
+                
+        if student_embs:
+            embeddings[student] = student_embs
+            
+        load_bar.progress((idx + 1) / len(students))
+    
+    load_bar.empty()
     return embeddings
 
 reference_embeddings = load_reference_embeddings()
