@@ -1,8 +1,9 @@
+import os
+os.environ["TF_USE_LEGACY_KERAS"] = "1" # שורה זו חייבת להופיע ראשונה!
 import streamlit as st
 from deepface import DeepFace
 from PIL import Image, ImageOps, ImageDraw, ImageFont
 import numpy as np
-import os
 import zipfile
 import random
 import cv2
@@ -151,8 +152,14 @@ STUDENT_ROSTER = st.session_state.student_roster
 
 # ====================== MODEL (מהקוד השני) ======================
 @st.cache_resource
+@st.cache_resource
 def load_trained_model():
-    return tf.keras.models.load_model(MODEL_PATH)
+    try:
+        # הוספת compile=False מונעת שגיאות שנובעות מפונקציות מרחק/לוס מותאמות אישית
+        return tf.keras.models.load_model(MODEL_PATH, compile=False)
+    except Exception as e:
+        st.error(f"שגיאה בטעינת המודל: {e}")
+        return None
 
 embedding_model = load_trained_model()
 
