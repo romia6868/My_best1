@@ -116,7 +116,7 @@ style_code = """
 """
 
 # הזרקת ה-CSS לאפליקציה בבת אחת
-st.markdown(style_code, unsafe_allow_html=True))
+st.markdown(style_code, unsafe_allow_html=True)
 
 # ====================== HELPER FUNCTIONS ======================
 def load_roster():
