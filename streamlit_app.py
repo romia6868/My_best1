@@ -1,4 +1,15 @@
 import os
+os.environ["TF_USE_LEGACY_KERAS"] = "1"
+import sys
+try:
+    import tensorflow.keras as keras
+except ImportError:
+    import tf_keras as keras
+    sys.modules["tensorflow.keras"] = keras
+
+import streamlit as st
+# רק עכשיו מותר לייבא את DeepFace
+from deepface import DeepFace
 os.environ["TF_USE_LEGACY_KERAS"] = "1" # שורה זו חייבת להופיע ראשונה!
 import streamlit as st
 from deepface import DeepFace
