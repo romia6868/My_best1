@@ -1,11 +1,7 @@
 streamlit==1.32.2
-numpy<2.0.0
-Pillow
 deepface==0.0.93
-tf-keras
-tensorflow==2.15.0
+tensorflow-cpu==2.15.0
+tf-keras==2.15.0
 opencv-python-headless
-rembg==2.0.53
-onnxruntime
-openpyxl
+rembg
 pandas
