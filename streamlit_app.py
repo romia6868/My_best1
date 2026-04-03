@@ -240,15 +240,23 @@ STUDENT_ROSTER = st.session_state.student_roster
 # ---- טעינת המודל ----
 @st.cache_resource
 def load_embedding_model():
-    model_path = os.path.join(BASE_DIR, "my_siamese3_model.h5")
-    model = tf.keras.models.load_model(
-        model_path,
-        custom_objects={
-            "l2_norm": tf.keras.layers.Lambda(
-                lambda x: tf.math.l2_normalize(x, axis=1), name="l2_norm"
-            )
-        }
-    )
+    base_model = MobileNetV2(input_shape=(128, 128, 3), include_top=False, weights='imagenet')
+    base_model.trainable = True
+    for layer in base_model.layers[:-50]:
+        layer.trainable = False
+
+    model = models.Sequential([
+        base_model,
+        layers.GlobalAveragePooling2D(),
+        layers.Dense(512, activation='relu'),
+        layers.BatchNormalization(),
+        layers.Dropout(0.3),
+        layers.Dense(256, activation='relu'),
+        layers.Dense(128, activation=None),
+    ], name="MobileNetV2_Siamese_Pro")
+
+    weights_path = os.path.join(BASE_DIR, "my_siamese3_weights.h5")
+    model.load_weights(weights_path)
     return model
 
 embedding_model = load_embedding_model()
