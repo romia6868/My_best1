@@ -1,9 +1,7 @@
 streamlit==1.32.2
 numpy==1.24.4
 Pillow
-deepface==0.0.93
-mediapipe==0.10.8
-tensorflow==2.12.0
+tensorflow-cpu==2.12.0
 keras==2.12.0
 opencv-python-headless
 rembg
