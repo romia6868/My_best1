@@ -1,16 +1,16 @@
 import os
-os.environ["TF_USE_LEGACY_KERAS"] = "1"
 import sys
-try:
-    import tensorflow.keras as keras
-except ImportError:
-    import tf_keras as keras
-    sys.modules["tensorflow.keras"] = keras
 
-import streamlit as st
-# רק עכשיו מותר לייבא את DeepFace
-from deepface import DeepFace
-os.environ["TF_USE_LEGACY_KERAS"] = "1" # שורה זו חייבת להופיע ראשונה!
+# --- תיקון קריטי ל-DEEPFACE (חובה לפני ה-imports) ---
+os.environ["TF_USE_LEGACY_KERAS"] = "1"
+import tensorflow as tf
+try:
+    import tf_keras as keras
+except ImportError:
+    import tensorflow.keras as keras
+sys.modules["tensorflow.keras"] = keras
+# --------------------------------------------------
+
 import streamlit as st
 from deepface import DeepFace
 from PIL import Image, ImageOps, ImageDraw, ImageFont
@@ -23,11 +23,7 @@ import json
 from datetime import datetime
 import pandas as pd
 from io import BytesIO
-import tensorflow as tf
-from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
-import shutil
 
-# ====================== CONFIG ======================
 st.set_page_config(
     page_title="Smart Attendance",
     layout="wide",
@@ -45,89 +41,62 @@ if "absence_counter" not in st.session_state:
 
 ABSENCE_THRESHOLD = 3
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ZIP_PATH = os.path.join(BASE_DIR, "My_Classmates_small.zip")
-EXTRACT_PATH = os.path.join(BASE_DIR, "My_Classmates")
-ROSTER_FILE = os.path.join(BASE_DIR, "student_roster.json")
-MODEL_PATH = os.path.join(BASE_DIR, "my_siamese3_model.h5")
-
-# חילוץ zip אם צריך
-if not os.path.exists(EXTRACT_PATH) and os.path.exists(ZIP_PATH):
-    with zipfile.ZipFile(ZIP_PATH, 'r') as zip_ref:
-        zip_ref.extractall(EXTRACT_PATH)
-
-REFERENCE_DIR = os.path.join(EXTRACT_PATH, "content", "My_Classmates_small")
-
-# ====================== CSS + Button CSS ======================
-style_code = """
+# ====================== CSS SECTION ======================
+css = """
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"/>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"/>
 <style>
 * { font-family: 'Space Grotesk', sans-serif !important; }
 .material-symbols-outlined {
-  font-family: 'Material Symbols Outlined' !important;
-  font-weight: normal; font-style: normal; font-size: 22px; line-height: 1;
-  letter-spacing: normal; text-transform: none; display: inline-block;
-  white-space: nowrap; -webkit-font-feature-settings: 'liga';
-  font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased;
+    font-family: 'Material Symbols Outlined' !important;
+    font-weight: normal; font-style: normal; font-size: 22px;
+    line-height: 1; letter-spacing: normal; text-transform: none;
+    display: inline-block; white-space: nowrap;
+    -webkit-font-feature-settings: 'liga'; font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
 }
-@keyframes pulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 #b8a9c940; } 50% { transform: scale(1.06); box-shadow: 0 0 0 8px #b8a9c900; } }
-@keyframes fadeInUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+@keyframes pulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 #b8a9c940; }
+    50% { transform: scale(1.06); box-shadow: 0 0 0 8px #b8a9c900; }
+}
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+    0% { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+}
 @keyframes progressFill { from { width: 0%; } }
-@keyframes scanLine { 0% { top: 0%; opacity: 1; } 100% { top: 100%; opacity: 0.3; } }
-
+@keyframes scanLine {
+    0% { top: 0%; opacity: 1; }
+    100% { top: 100%; opacity: 0.3; }
+}
 .stApp { background: #f0eef4 !important; }
 .main-header { display: flex; align-items: center; gap: 14px; padding: 1.5rem 0 1rem; border-bottom: 1px solid #e4dff0; margin-bottom: 1.5rem; }
 .header-icon { width: 52px; height: 52px; background: linear-gradient(135deg, #b8a9c9, #9585b0); border-radius: 14px; display: flex; align-items: center; justify-content: center; animation: pulse 3s ease-in-out infinite; }
 .header-icon .material-symbols-outlined { font-size: 28px; color: white; }
 .header-title { font-size: 28px; font-weight: 700; background: linear-gradient(90deg, #6b5a8a, #9585b0, #c4b8d8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-
 .scan-container { position: relative; display: inline-block; width: 100%; }
 .scan-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 10; border-radius: 8px; overflow: hidden; }
 .scan-line { position: absolute; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, #b8a9c9, #c4b8d8, #b8a9c9, transparent); animation: scanLine 1.5s ease-in-out infinite; box-shadow: 0 0 12px #b8a9c980; }
-
 .upload-zone { border: 1.5px dashed #c4b8d8; border-radius: 14px; padding: 2.5rem; text-align: center; background: #ebe8f240; margin-bottom: 1rem; transition: all 0.2s; }
 .upload-zone:hover { border-color: #9585b0; background: #ebe8f260; }
-
-.stat-row { display: flex; gap: 12px; margin: 1.5rem 0; }
 .stat-card { flex: 1; background: #fff; border: 1px solid #e4dff0; border-radius: 12px; padding: 16px 18px; transition: all 0.2s; position: relative; overflow: hidden; }
-.stat-card::after { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, #ebe8f230, transparent); background-size: 400px 100%; animation: shimmer 2.5s infinite; }
 .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px #b8a9c920; border-color: #c4b8d8; }
-
-.stat-label { font-size: 11px; color: #a098b8; text-transform: uppercase; letter-spacing: 0.5px; }
-.stat-val { font-size: 28px; font-weight: 700; }
 .stat-green { color: #68b88a; }
 .stat-red { color: #d4707a; }
 .stat-gold { background: linear-gradient(90deg,#6b5a8a,#b8a9c9); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-
-.progress-container { background: #ebe8f2; border-radius: 8px; height: 6px; margin: 8px 0 16px; overflow: hidden; }
-.progress-bar { height: 100%; background: linear-gradient(90deg, #b8a9c9, #c4b8d8); border-radius: 8px; animation: progressFill 1.5s ease-out forwards; }
-
-.section-divider { display: flex; align-items: center; gap: 12px; margin: 1.8rem 0 1.2rem; }
-.divider-line { flex: 1; height: 1px; background: #e4dff0; }
-.divider-badge { font-size: 12px; padding: 4px 14px; border-radius: 20px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
-.badge-present { background: #68b88a20; color: #68b88a; }
-.badge-absent { background: #d4707a20; color: #d4707a; }
-.badge-unknown { background: #e8a85020; color: #e8a850; }
-
-.student-card { animation: fadeInUp 0.4s ease both; text-align: center; }
-
 [data-testid="stSidebar"] { background: #e8e4f0 !important; border-right: 1px solid #e4dff0 !important; }
-.sidebar-title { font-size: 15px; font-weight: 700; color: #4a3a6a; margin-bottom: 1rem; display: flex; align-items: center; gap: 6px; }
-.sidebar-student { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #f0eef4; border-radius: 8px; margin-bottom: 6px; font-size: 13px; color: #4a3a6a; border: 1px solid #e4dff0; transition: all 0.2s; }
-.sidebar-student:hover { border-color: #b8a9c9; transform: translateX(4px); box-shadow: 2px 0 8px #b8a9c920; }
 
-.stButton > button { background: #ebe8f2 !important; color: #4a3a6a !important; border: 1.5px solid #e4dff0 !important; border-radius: 10px !important; padding: 11px 16px !important; font-size: 14px !important; font-weight: 500 !important; width: 100% !important; transition: all 0.2s !important; }
-.stButton > button:hover { border-color: #9585b0 !important; transform: translateY(-2px) !important; box-shadow: 0 4px 12px #b8a9c930 !important; }
-.stButton > button[kind="primary"] { background: linear-gradient(135deg, #b8a9c9, #9585b0) !important; color: white !important; border: none !important; box-shadow: 0 4px 14px #b8a9c940 !important; padding: 13px 28px !important; font-size: 15px !important; font-weight: 600 !important; margin-top: 12px !important; }
-.stDownloadButton > button { background: #ebe8f2 !important; color: #9585b0 !important; border: 1.5px solid #b8a9c9 !important; border-radius: 10px !important; font-size: 13px !important; font-weight: 600 !important; width: 100% !important; transition: all 0.2s !important; margin-top: 8px !important; }
-.stDownloadButton > button:hover { background: #e4dff0 !important; transform: translateY(-1px) !important; }
+/* Buttons */
+.stButton > button { background: #ebe8f2 !important; color: #4a3a6a !important; border: 1.5px solid #e4dff0 !important; border-radius: 10px !important; width: 100% !important; transition: all 0.2s !important; }
+.stButton > button[kind="primary"] { background: linear-gradient(135deg, #b8a9c9, #9585b0) !important; color: white !important; border: none !important; }
 </style>
 """
 
-# הזרקת ה-CSS לאפליקציה בבת אחת
-st.markdown(style_code, unsafe_allow_html=True)
+# הזרקת ה-CSS
+st.markdown(css, unsafe_allow_html=True)
 
 # ====================== HELPER FUNCTIONS ======================
 def load_roster():
