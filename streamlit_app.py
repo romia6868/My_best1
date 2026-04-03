@@ -48,7 +48,7 @@ if not os.path.exists(EXTRACT_PATH) and os.path.exists(ZIP_PATH):
 REFERENCE_DIR = os.path.join(EXTRACT_PATH, "content", "My_Classmates_small")
 
 # ====================== CSS + Button CSS ======================
-css = """
+style_code = """
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"/>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"/>
 <style>
@@ -106,10 +106,7 @@ css = """
 .sidebar-title { font-size: 15px; font-weight: 700; color: #4a3a6a; margin-bottom: 1rem; display: flex; align-items: center; gap: 6px; }
 .sidebar-student { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #f0eef4; border-radius: 8px; margin-bottom: 6px; font-size: 13px; color: #4a3a6a; border: 1px solid #e4dff0; transition: all 0.2s; }
 .sidebar-student:hover { border-color: #b8a9c9; transform: translateX(4px); box-shadow: 2px 0 8px #b8a9c920; }
-</style>
-"""
-button_css = """
-<style>
+
 .stButton > button { background: #ebe8f2 !important; color: #4a3a6a !important; border: 1.5px solid #e4dff0 !important; border-radius: 10px !important; padding: 11px 16px !important; font-size: 14px !important; font-weight: 500 !important; width: 100% !important; transition: all 0.2s !important; }
 .stButton > button:hover { border-color: #9585b0 !important; transform: translateY(-2px) !important; box-shadow: 0 4px 12px #b8a9c930 !important; }
 .stButton > button[kind="primary"] { background: linear-gradient(135deg, #b8a9c9, #9585b0) !important; color: white !important; border: none !important; box-shadow: 0 4px 14px #b8a9c940 !important; padding: 13px 28px !important; font-size: 15px !important; font-weight: 600 !important; margin-top: 12px !important; }
@@ -117,10 +114,9 @@ button_css = """
 .stDownloadButton > button:hover { background: #e4dff0 !important; transform: translateY(-1px) !important; }
 </style>
 """
-st.markdown(css, unsafe_allow_html=True)
-st.markdown(button_css, unsafe_allow_html=True)
-# הזרקת ה-CSS לאפליקציה (זה החלק הקריטי)
-st.markdown(style_code, unsafe_allow_html=True)
+
+# הזרקת ה-CSS לאפליקציה בבת אחת
+st.markdown(style_code, unsafe_allow_html=True))
 
 # ====================== HELPER FUNCTIONS ======================
 def load_roster():
