@@ -3,7 +3,7 @@ numpy
 Pillow
 deepface==0.0.93
 mediapipe
-tf-keras
+tensorflow==2.15.0
 opencv-python-headless
 rembg
 onnxruntime
