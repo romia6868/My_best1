@@ -389,42 +389,68 @@ def extract_faces(image, confidence_threshold=0.7):
         st.warning(f"Face detection error: {e}")
     return faces, img_rgb
 
-def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.49):
-    # ... (הפונקציה המלאה עם scan animation, progress, drawing boxes, stats, chronic alert וכו')
-    # (כדי לא להאריך יותר מדי כאן – היא זהה לקוד הראשון שלך, רק עם euclidean_distance במקום cosine)
+def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.55):
+    # 1. אנימציית סריקה (Scan Animation)
     scan_placeholder = st.empty()
-    scan_placeholder.markdown("""<div class="scan-container"><div class="scan-overlay"><div class="scan-line"></div></div>
-      <div style="background:#c9956615;border-radius:8px;padding:2rem;text-align:center;">
-        <span class="material-symbols-outlined" style="font-size:48px;color:#c99566;">document_scanner</span>
-        <p style="color:#b09080;margin-top:8px;font-size:14px;">Scanning photo...</p>
-      </div></div>""", unsafe_allow_html=True)
+    scan_placeholder.markdown("""
+    <div class="scan-container">
+        <div class="scan-overlay"><div class="scan-line"></div></div>
+        <div style="background:#ebe8f240; border-radius:14px; padding:2.5rem; text-align:center; border:1px solid #c4b8d8;">
+            <span class="material-symbols-outlined" style="font-size:48px; color:#9585b0;">face_detect</span>
+            <p style="color:#4a3a6a; margin-top:12px; font-weight:500;">Scanning Classroom Photo...</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    progress = st.progress(0, text="Detecting faces...")
-    faces, original_img_rgb = extract_faces(image_pil, confidence_threshold)
-    progress.progress(30, text="Analyzing faces...")
+    progress = st.progress(0, text="Initializing engine...")
+    
+    # המרת התמונה לפורמט ש-face_recognition מבין
+    img_rgb = np.array(image_pil.convert("RGB"))
+    
+    # 2. זיהוי מיקומי פנים (מציאת הריבועים)
+    progress.progress(20, text="Detecting faces in frame...")
+    face_locations = face_recognition.face_locations(img_rgb, model="hog") # hog מהיר יותר ל-CPU
+    
+    # 3. יצירת קידודים (Encodings) לכל פנים שנמצאו
+    progress.progress(40, text="Extracting facial features...")
+    face_encodings = face_recognition.face_encodings(img_rgb, face_locations)
+    
     scan_placeholder.empty()
 
     present_students = {}
     recognized_faces = []
-    for i, data in enumerate(faces):
-        face_pil = data["face"]
-        box = data["box"]
-        progress.progress(30 + int(60 * i / max(len(faces),1)), text=f"Identifying face {i+1}...")
+
+    # 4. לופ זיהוי והשוואה מול המאגר
+    for i, current_encoding in enumerate(face_encodings):
+        top, right, bottom, left = face_locations[i]
+        # התאמת פורמט הבוקס לקוד הציור שלך [x, y, w, h]
+        box = [left, top, right - left, bottom - top]
         
-        emb = get_embedding(face_pil)
-        best_name, best_dist = None, float("inf")
-        for name, ref_embs in reference_embeddings.items():
-            dists = [euclidean_distance(emb, r) for r in ref_embs]
-            avg_dist = np.mean(dists)
+        progress.progress(40 + int(50 * (i + 1) / max(len(face_encodings), 1)), 
+                          text=f"Identifying student {i+1} of {len(face_encodings)}...")
+
+        best_name = None
+        best_dist = 1.0 # מרחק מקסימלי ב-face_recognition
+
+        # השוואה מול reference_embeddings (שצריכים להיות מסוג face_recognition encoding)
+        for name, ref_encodings in reference_embeddings.items():
+            # מחשב מרחק אוקלידי בין הפנים הנוכחיות לכל התמונות של התלמיד
+            distances = face_recognition.face_distance(ref_encodings, current_encoding)
+            avg_dist = np.mean(distances)
+            
             if avg_dist < best_dist:
                 best_dist = avg_dist
                 best_name = name
 
+        # בדיקת סף ביטחון (Threshold)
         if best_dist > threshold:
-            best_name = None
+            best_name = "Unknown"
 
-        if best_name and best_name not in present_students:
-            present_students[best_name] = {"img": face_pil, "unknown": False}
+        # חיתוך התמונה הקטנה לגלריה
+        face_img_pil = image_pil.crop((left, top, right, bottom))
+
+        if best_name != "Unknown" and best_name not in present_students:
+            present_students[best_name] = {"img": face_img_pil, "unknown": False}
             recognized_faces.append({"name": best_name, "box": box, "dist": best_dist, "unknown": False})
         else:
             recognized_faces.append({"name": "Unknown", "box": box, "dist": best_dist, "unknown": True})
@@ -432,6 +458,58 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.49):
     progress.progress(100)
     progress.empty()
 
+    # --- 5. חלק הציור על התמונה (Drawing) ---
+    img_draw = image_pil.copy()
+    draw = ImageDraw.Draw(img_draw)
+    
+    try:
+        font = ImageFont.truetype("Arial.ttf", 20)
+    except:
+        font = ImageFont.load_default()
+
+    for face in recognized_faces:
+        x, y, w, h = face["box"]
+        color = "#68b88a" if not face["unknown"] else "#d4707a"
+        # ציור מסגרת מעוצבת
+        draw.rectangle([x, y, x + w, y + h], outline=color, width=3)
+        draw.rectangle([x, y - 25, x + w, y], fill=color)
+        draw.text((x + 5, y - 22), face["name"], fill="white", font=font)
+
+    st.image(img_draw, use_column_width=True, caption="Processed Attendance View")
+
+    # --- 6. סטטיסטיקות וסיכום (Stats & Results) ---
+    known_present = [name for name in present_students.keys()]
+    missing = [s for s in st.session_state.student_roster if s not in known_present]
+    
+    # עדכון סטייט לשימוש בשאר האפליקציה
+    st.session_state.last_results = {
+        "present": known_present,
+        "missing": missing,
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M")
+    }
+
+    # תצוגת כרטיסי סטטיסטיקה
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(f"""<div class="stat-card"><div class="stat-label"><span class="material-symbols-outlined">group</span>PRESENT</div>
+                    <div class="stat-val stat-green">{len(known_present)}</div></div>""", unsafe_allow_html=True)
+    with col2:
+        st.markdown(f"""<div class="stat-card"><div class="stat-label"><span class="material-symbols-outlined">person_off</span>ABSENT</div>
+                    <div class="stat-val stat-red">{len(missing)}</div></div>""", unsafe_allow_html=True)
+    with col3:
+        attendance_rate = int(len(known_present) / len(st.session_state.student_roster) * 100) if st.session_state.student_roster else 0
+        st.markdown(f"""<div class="stat-card"><div class="stat-label"><span class="material-symbols-outlined">analytics</span>RATE</div>
+                    <div class="stat-val stat-gold">{attendance_rate}%</div></div>""", unsafe_allow_html=True)
+
+    # --- גלריית נוכחים (Gallery) ---
+    if present_students:
+        st.markdown("### 📸 Identified Students")
+        cols = st.columns(5)
+        for i, (name, data) in enumerate(present_students.items()):
+            with cols[i % 5]:
+                st.image(data["img"], caption=name, use_column_width=True)
+                
+    return present_students
     # המשך עם ציור, stats, alerts, gallery – בדיוק כמו בקוד המקורי שלך
     # (אני משאיר אותו כפי שהוא כדי שהקוד יהיה ארוך ומלא)
 
