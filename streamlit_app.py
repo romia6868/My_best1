@@ -99,16 +99,22 @@ css = """
 st.markdown(css, unsafe_allow_html=True)
 
 # ====================== HELPER FUNCTIONS ======================
+# 1. הגדרת שם הקובץ (חובה שיופיע מעל הפונקציות)
+ROSTER_FILE = "student_roster.json"
+
+# 2. פונקציית טעינה - מחזירה את רשימת ברירת המחדל אם אין קובץ
 def load_roster():
     if os.path.exists(ROSTER_FILE):
         with open(ROSTER_FILE, "r") as f:
             return json.load(f)
-    return ['Maayan','Tomer','Roei','Zohar','Ilay']
+    # כאן את מכניסה את רשימת התלמידים של הפרויקט שלך
+    return ['Maayan', 'Tomer', 'Roei', 'Zohar', 'Ilay']
 
+# 3. פונקציית שמירה - מעדכנת את הקובץ כשאת משנה משהו
 def save_roster(roster):
     with open(ROSTER_FILE, "w") as f:
         json.dump(roster, f)
-
+        
 def update_absences(missing_students):
     for name in missing_students:
         st.session_state.absence_counter[name] = st.session_state.absence_counter.get(name, 0) + 1
