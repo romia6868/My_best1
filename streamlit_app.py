@@ -508,6 +508,9 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.28):
 
     progress = st.progress(0, text="Detecting faces...")
     faces, original_img_rgb = extract_faces(image_pil, confidence_threshold)
+    if not reference_embeddings:
+    st.error("No reference embeddings found! Make sure reference_embeddings.npy is uploaded to the repo.")
+    return    
     progress.progress(30, text="Analyzing faces...")
     scan_placeholder.empty()
 
