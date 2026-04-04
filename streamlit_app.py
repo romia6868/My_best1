@@ -13,6 +13,7 @@ from io import BytesIO
 import tensorflow as tf
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras import layers, models
+import mediapipe as mp
 
 st.set_page_config(
     page_title="Smart Attendance",
@@ -477,7 +478,6 @@ def generate_class_image():
     return np.array(bg_pil.convert("RGB")), present
 
 def extract_faces(image, confidence_threshold=0.7):
-    import mediapipe as mp
     img_rgb = np.array(image.convert("RGB"))
     faces = []
     
@@ -499,7 +499,6 @@ def extract_faces(image, confidence_threshold=0.7):
                 faces.append({"face": face_pil, "box": (x1, y1, x2-x1, y2-y1)})
     
     return faces, img_rgb
-
 
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.28):
     scan_placeholder = st.empty()
