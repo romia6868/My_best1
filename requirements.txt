@@ -8,3 +8,4 @@ rembg
 onnxruntime
 openpyxl
 pandas
+requests
