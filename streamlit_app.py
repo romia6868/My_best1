@@ -727,3 +727,34 @@ elif st.session_state.mode == "camera":
             class_image.thumbnail((1200, 1200))
         if st.button("Scan for Attendance", key="scan_camera", type="primary"):
             recognize_faces(class_image, confidence, threshold)
+
+
+def extract_faces(image, confidence_threshold=0.7):
+    img_rgb = np.array(image.convert("RGB"))
+    faces = []
+    try:
+        face_objs = DeepFace.extract_faces(
+            img_path=img_rgb,
+            detector_backend="retinaface",
+            enforce_detection=False,
+            align=True
+        )
+        for face_obj in face_objs:
+            if face_obj["confidence"] < confidence_threshold:
+                continue
+            face_arr = face_obj["face"]
+            face_pil = Image.fromarray((face_arr * 255).astype(np.uint8)).convert("RGB")
+            region = face_obj["facial_area"]
+            x, y, w, h = region["x"], region["y"], region["w"], region["h"]
+            pad_x = int(0.2 * w)
+            pad_y = int(0.2 * h)
+            x1 = max(0, x - pad_x)
+            y1 = max(0, y - pad_y)
+            x2 = min(img_rgb.shape[1], x + w + pad_x)
+            y2 = min(img_rgb.shape[0], y + h + pad_y)
+            faces.append({"face": face_pil, "box": (x1, y1, x2-x1, y2-y1)})
+    except Exception as e:
+        st.warning(f"Face detection error: {e}")
+        import traceback
+        st.code(traceback.format_exc())
+    return faces, img_rgb
