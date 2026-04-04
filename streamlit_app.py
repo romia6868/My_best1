@@ -1,8 +1,22 @@
+
+import requests
+import os
+
+DEEPFACE_DIR = os.path.expanduser("~/.deepface/weights")
+os.makedirs(DEEPFACE_DIR, exist_ok=True)
+
+RETINAFACE_PATH = os.path.join(DEEPFACE_DIR, "retinaface.h5")
+if not os.path.exists(RETINAFACE_PATH) or os.path.getsize(RETINAFACE_PATH) < 1000:
+    url = "https://github.com/serengil/deepface_models/releases/download/v1.0/retinaface.h5"
+    r = requests.get(url, stream=True)
+    with open(RETINAFACE_PATH, 'wb') as f:
+        for chunk in r.iter_content(chunk_size=8192):
+            f.write(chunk)
+
 import streamlit as st
 from deepface import DeepFace
 from PIL import Image, ImageOps, ImageDraw, ImageFont
 import numpy as np
-import os
 import zipfile
 import random
 import cv2
@@ -274,35 +288,8 @@ def get_embedding(face_img):
 
 @st.cache_resource
 def load_reference_embeddings():
-    embeddings = {}
-    for student in os.listdir(REFERENCE_DIR):
-        student_path = os.path.join(REFERENCE_DIR, student)
-        if os.path.isdir(student_path):
-            student_embeddings = []
-            for file in os.listdir(student_path):
-                if file.lower().endswith((".jpg", ".jpeg", ".png", ".jfif")):
-                    img_path = os.path.join(student_path, file)
-                    try:
-                        face_objs = DeepFace.extract_faces(
-                            img_path=img_path,
-                            detector_backend="retinaface",
-                            enforce_detection=False,
-                            align=True
-                        )
-                        if face_objs and face_objs[0]["confidence"] > 0.5:
-                            face_arr = face_objs[0]["face"]
-                            face_pil = Image.fromarray((face_arr * 255).astype(np.uint8)).convert("RGB")
-                            emb = get_embedding(face_pil)
-                            student_embeddings.append(emb)
-                    except:
-                        try:
-                            img = Image.open(img_path).convert("RGB")
-                            emb = get_embedding(img)
-                            student_embeddings.append(emb)
-                        except:
-                            pass
-            if student_embeddings:
-                embeddings[student] = student_embeddings
+    path = os.path.join(BASE_DIR, "reference_embeddings.npy")
+    embeddings = np.load(path, allow_pickle=True).item()
     return embeddings
 
 @st.cache_resource
