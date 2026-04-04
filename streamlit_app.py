@@ -1,24 +1,4 @@
 
-import retinaface.model.retinaface_model as rm
-import inspect, os, requests
-
-# מציאת הנתיב המדויק שבו הוא מחפש
-rm_path = os.path.dirname(inspect.getfile(rm))
-retinaface_weights = os.path.join(rm_path, "retinaface.h5")
-print(f"Looking for weights at: {retinaface_weights}")
-print(f"Exists: {os.path.exists(retinaface_weights)}")
-if os.path.exists(retinaface_weights):
-    print(f"Size: {os.path.getsize(retinaface_weights)} bytes")
-
-# הורדה למיקום הנכון
-if not os.path.exists(retinaface_weights) or os.path.getsize(retinaface_weights) < 1000:
-    os.remove(retinaface_weights) if os.path.exists(retinaface_weights) else None
-    url = "https://github.com/serengil/deepface_models/releases/download/v1.0/retinaface.h5"
-    r = requests.get(url, stream=True)
-    with open(retinaface_weights, 'wb') as f:
-        for chunk in r.iter_content(chunk_size=8192):
-            f.write(chunk)
-    print(f"Downloaded: {os.path.getsize(retinaface_weights)} bytes")
             
 import streamlit as st
 from deepface import DeepFace
