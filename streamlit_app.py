@@ -1,22 +1,15 @@
-import requests
+
+import retinaface
 import os
+print(os.path.dirname(retinaface.__file__))
 
-DEEPFACE_DIR = os.path.expanduser("~/.deepface/weights")
-os.makedirs(DEEPFACE_DIR, exist_ok=True)
-
-RETINAFACE_PATH = os.path.join(DEEPFACE_DIR, "retinaface.h5")
-
-# מוחקים את הקובץ הפגום ומורידים מחדש
-if os.path.exists(RETINAFACE_PATH):
-    os.remove(RETINAFACE_PATH)
-
-url = "https://github.com/serengil/deepface_models/releases/download/v1.0/retinaface.h5"
-r = requests.get(url, stream=True)
-with open(RETINAFACE_PATH, 'wb') as f:
-    for chunk in r.iter_content(chunk_size=8192):
-        f.write(chunk)
-
-print(f"RetinaFace downloaded: {os.path.getsize(RETINAFACE_PATH)} bytes")
+# חיפוש כל קבצי h5 של retinaface
+for root, dirs, files in os.walk(os.path.expanduser("~")):
+    for f in files:
+        if "retinaface" in f.lower():
+            full = os.path.join(root, f)
+            print(f"Found: {full} — {os.path.getsize(full)} bytes")
+            
 import streamlit as st
 from deepface import DeepFace
 from PIL import Image, ImageOps, ImageDraw, ImageFont
