@@ -14,7 +14,7 @@ import tensorflow as tf
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras import layers, models
 import mediapipe as mp
-
+st.write(mp.__version__)
 st.set_page_config(
     page_title="Smart Attendance",
     layout="wide",
