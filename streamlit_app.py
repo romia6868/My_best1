@@ -1,9 +1,7 @@
-
-            
 import streamlit as st
-from deepface import DeepFace
 from PIL import Image, ImageOps, ImageDraw, ImageFont
 import numpy as np
+import os
 import zipfile
 import random
 import cv2
@@ -245,7 +243,6 @@ def load_embedding_model():
     base_model.trainable = True
     for layer in base_model.layers[:-50]:
         layer.trainable = False
-
     model = models.Sequential([
         base_model,
         layers.GlobalAveragePooling2D(),
@@ -255,7 +252,6 @@ def load_embedding_model():
         layers.Dense(256, activation='relu'),
         layers.Dense(128, activation=None),
     ], name="MobileNetV2_Siamese_Pro")
-
     weights_path = os.path.join(BASE_DIR, "my_siamese3_weights.weights.h5")
     model.load_weights(weights_path)
     return model
@@ -263,15 +259,16 @@ def load_embedding_model():
 embedding_model = load_embedding_model()
 
 def get_embedding(face_img):
-    """מקבל PIL Image, מחזיר embedding מנורמל"""
     img_array = np.array(face_img.resize((128, 128))).astype("float32") / 255.0
     img_array = np.expand_dims(img_array, axis=0)
     embedding = embedding_model.predict(img_array, verbose=0)[0]
-    # נרמול נוסף למקרה שה-l2_norm לא טעון כהלכה
     norm = np.linalg.norm(embedding)
     if norm > 0:
         embedding = embedding / norm
     return embedding
+
+def cosine_distance(a, b):
+    return 1 - np.dot(a, b)
 
 @st.cache_resource
 def load_reference_embeddings():
@@ -395,17 +392,20 @@ with st.sidebar:
                     for idx in range(len(photos_collected)):
                         img_path = os.path.join(student_dir, f"{new_name}_{idx+1}.jpg")
                         try:
-                            face_objs = DeepFace.extract_faces(
-                                img_path=img_path,
-                                detector_backend="retinaface",
-                                enforce_detection=False,
-                                align=True
-                            )
-                            if face_objs and face_objs[0]["confidence"] > 0.5:
-                                face_arr = face_objs[0]["face"]
-                                face_pil = Image.fromarray((face_arr * 255).astype(np.uint8)).convert("RGB")
-                                emb = get_embedding(face_pil)
-                                new_embeddings.append(emb)
+                            # חיתוך פנים עם OpenCV
+                            img_bgr = cv2.imread(img_path)
+                            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+                            img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
+                            face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+                            detected = face_cascade.detectMultiScale(img_gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
+                            if len(detected) > 0:
+                                x, y, w, h = detected[0]
+                                face_crop = img_rgb[y:y+h, x:x+w]
+                                face_pil = Image.fromarray(face_crop).convert("RGB")
+                            else:
+                                face_pil = Image.open(img_path).convert("RGB")
+                            emb = get_embedding(face_pil)
+                            new_embeddings.append(emb)
                         except:
                             try:
                                 img = Image.open(img_path).convert("RGB")
@@ -480,10 +480,8 @@ def extract_faces(image, confidence_threshold=0.7):
     img_rgb = np.array(image.convert("RGB"))
     img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
     faces = []
-    
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
     detected = face_cascade.detectMultiScale(img_gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
-    
     for (x, y, w, h) in detected:
         pad_x = int(0.2 * w)
         pad_y = int(0.2 * h)
@@ -494,8 +492,8 @@ def extract_faces(image, confidence_threshold=0.7):
         face_crop = img_rgb[y1:y2, x1:x2]
         face_pil = Image.fromarray(face_crop).convert("RGB")
         faces.append({"face": face_pil, "box": (x1, y1, x2-x1, y2-y1)})
-    
     return faces, img_rgb
+
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.28):
     scan_placeholder = st.empty()
     scan_placeholder.markdown("""
@@ -521,18 +519,13 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.28):
         face_pil = data["face"]
         box = data["box"]
         progress.progress(30 + int(60 * i / total), text=f"Identifying face {i+1} of {len(faces)}...")
-
         emb = get_embedding(face_pil)
-
         avg_distances = {}
         for name, ref_embs in reference_embeddings.items():
             avg_distances[name] = min([cosine_distance(emb, r) for r in ref_embs])
-
         best_name, best_dist = min(avg_distances.items(), key=lambda x: x[1])
-
         if best_dist > threshold:
             best_name = None
-
         if best_name and best_name not in present_students:
             present_students[best_name] = {"img": face_pil, "unknown": False}
             recognized_faces.append({"name": best_name, "box": box, "dist": best_dist, "unknown": False})
@@ -703,4 +696,3 @@ elif st.session_state.mode == "camera":
             class_image.thumbnail((1200, 1200))
         if st.button("Scan for Attendance", key="scan_camera", type="primary"):
             recognize_faces(class_image, confidence, threshold)
-
