@@ -477,22 +477,29 @@ def generate_class_image():
     return np.array(bg_pil.convert("RGB")), present
 
 def extract_faces(image, confidence_threshold=0.7):
+    import mediapipe as mp
     img_rgb = np.array(image.convert("RGB"))
-    img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
     faces = []
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    detected = face_cascade.detectMultiScale(img_gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
-    for (x, y, w, h) in detected:
-        pad_x = int(0.2 * w)
-        pad_y = int(0.2 * h)
-        x1 = max(0, x - pad_x)
-        y1 = max(0, y - pad_y)
-        x2 = min(img_rgb.shape[1], x + w + pad_x)
-        y2 = min(img_rgb.shape[0], y + h + pad_y)
-        face_crop = img_rgb[y1:y2, x1:x2]
-        face_pil = Image.fromarray(face_crop).convert("RGB")
-        faces.append({"face": face_pil, "box": (x1, y1, x2-x1, y2-y1)})
+    
+    mp_face = mp.solutions.face_detection
+    with mp_face.FaceDetection(model_selection=1, min_detection_confidence=confidence_threshold) as detector:
+        results = detector.process(img_rgb)
+        if results.detections:
+            h, w = img_rgb.shape[:2]
+            for detection in results.detections:
+                bbox = detection.location_data.relative_bounding_box
+                x1 = max(0, int(bbox.xmin * w))
+                y1 = max(0, int(bbox.ymin * h))
+                x2 = min(w, int((bbox.xmin + bbox.width) * w))
+                y2 = min(h, int((bbox.ymin + bbox.height) * h))
+                face_crop = img_rgb[y1:y2, x1:x2]
+                if face_crop.size == 0:
+                    continue
+                face_pil = Image.fromarray(face_crop).convert("RGB")
+                faces.append({"face": face_pil, "box": (x1, y1, x2-x1, y2-y1)})
+    
     return faces, img_rgb
+
 
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.28):
     scan_placeholder = st.empty()
