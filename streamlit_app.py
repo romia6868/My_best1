@@ -1,4 +1,3 @@
-
 import requests
 import os
 
@@ -6,13 +5,18 @@ DEEPFACE_DIR = os.path.expanduser("~/.deepface/weights")
 os.makedirs(DEEPFACE_DIR, exist_ok=True)
 
 RETINAFACE_PATH = os.path.join(DEEPFACE_DIR, "retinaface.h5")
-if not os.path.exists(RETINAFACE_PATH) or os.path.getsize(RETINAFACE_PATH) < 1000:
-    url = "https://github.com/serengil/deepface_models/releases/download/v1.0/retinaface.h5"
-    r = requests.get(url, stream=True)
-    with open(RETINAFACE_PATH, 'wb') as f:
-        for chunk in r.iter_content(chunk_size=8192):
-            f.write(chunk)
 
+# מוחקים את הקובץ הפגום ומורידים מחדש
+if os.path.exists(RETINAFACE_PATH):
+    os.remove(RETINAFACE_PATH)
+
+url = "https://github.com/serengil/deepface_models/releases/download/v1.0/retinaface.h5"
+r = requests.get(url, stream=True)
+with open(RETINAFACE_PATH, 'wb') as f:
+    for chunk in r.iter_content(chunk_size=8192):
+        f.write(chunk)
+
+print(f"RetinaFace downloaded: {os.path.getsize(RETINAFACE_PATH)} bytes")
 import streamlit as st
 from deepface import DeepFace
 from PIL import Image, ImageOps, ImageDraw, ImageFont
