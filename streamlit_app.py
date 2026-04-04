@@ -498,32 +498,23 @@ def generate_class_image():
 
 def extract_faces(image, confidence_threshold=0.7):
     img_rgb = np.array(image.convert("RGB"))
+    img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
     faces = []
-    try:
-        face_objs = DeepFace.extract_faces(
-            img_path=img_rgb,
-            detector_backend="retinaface",
-            enforce_detection=False,
-            align=True
-        )
-        for face_obj in face_objs:
-            if face_obj["confidence"] < confidence_threshold:
-                continue
-            face_arr = face_obj["face"]
-            face_pil = Image.fromarray((face_arr * 255).astype(np.uint8)).convert("RGB")
-            region = face_obj["facial_area"]
-            x, y, w, h = region["x"], region["y"], region["w"], region["h"]
-            pad_x = int(0.2 * w)
-            pad_y = int(0.2 * h)
-            x1 = max(0, x - pad_x)
-            y1 = max(0, y - pad_y)
-            x2 = min(img_rgb.shape[1], x + w + pad_x)
-            y2 = min(img_rgb.shape[0], y + h + pad_y)
-            faces.append({"face": face_pil, "box": (x1, y1, x2-x1, y2-y1)})
-    except Exception as e:
-        st.warning(f"Face detection error: {e}")
-        import traceback
-        st.code(traceback.format_exc())
+    
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    detected = face_cascade.detectMultiScale(img_gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
+    
+    for (x, y, w, h) in detected:
+        pad_x = int(0.2 * w)
+        pad_y = int(0.2 * h)
+        x1 = max(0, x - pad_x)
+        y1 = max(0, y - pad_y)
+        x2 = min(img_rgb.shape[1], x + w + pad_x)
+        y2 = min(img_rgb.shape[0], y + h + pad_y)
+        face_crop = img_rgb[y1:y2, x1:x2]
+        face_pil = Image.fromarray(face_crop).convert("RGB")
+        faces.append({"face": face_pil, "box": (x1, y1, x2-x1, y2-y1)})
+    
     return faces, img_rgb
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.28):
     scan_placeholder = st.empty()
