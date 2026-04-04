@@ -3,6 +3,7 @@ numpy
 Pillow
 tensorflow==2.15.0
 opencv-python-headless
+mediapipe
 rembg
 onnxruntime
 openpyxl
