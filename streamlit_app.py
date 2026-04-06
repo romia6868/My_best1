@@ -313,10 +313,11 @@ def load_deepface_reference_embeddings():
                         emb = np.array(result[0]["embedding"])
                         emb = emb / np.linalg.norm(emb)
                         student_embeddings.append(emb)
-                    except:
-                        pass
+                    except Exception as e:
+                        st.warning(f"Failed {file}: {e}")
             if student_embeddings:
                 embeddings[student] = student_embeddings
+                st.write(f"✓ {student}: {len(student_embeddings)}")
     return embeddings
 
 @st.cache_resource
@@ -569,7 +570,9 @@ def extract_faces_deepface(image, confidence_threshold=0.7):
         st.warning(f"Face detection error: {e}")
     return faces, img_rgb
 
-def extract_faces_opencv(image, confidence_threshold=0.7):
+def extract_faces_deepface(image, confidence_threshold=0.7):
+    if isinstance(image, tuple):
+        image = image[0]
     img_rgb = np.array(image.convert("RGB"))
     img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
     faces = []
