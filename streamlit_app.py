@@ -1,4 +1,5 @@
 import streamlit as st
+from deepface import DeepFace
 from PIL import Image, ImageOps, ImageDraw, ImageFont
 import numpy as np
 import os
@@ -13,6 +14,7 @@ from io import BytesIO
 import tensorflow as tf
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras import layers, models
+
 st.set_page_config(
     page_title="Smart Attendance",
     layout="wide",
@@ -27,6 +29,8 @@ if "last_results" not in st.session_state:
     st.session_state.last_results = None
 if "absence_counter" not in st.session_state:
     st.session_state.absence_counter = {}
+if "selected_model" not in st.session_state:
+    st.session_state.selected_model = "DeepFace (Facenet512)"
 
 ABSENCE_THRESHOLD = 3
 
@@ -235,9 +239,9 @@ if "student_roster" not in st.session_state:
 
 STUDENT_ROSTER = st.session_state.student_roster
 
-# ---- טעינת המודל ----
+# ---- טעינת המודל הסיאמי ----
 @st.cache_resource
-def load_embedding_model():
+def load_siamese_model():
     base_model = MobileNetV2(input_shape=(128, 128, 3), include_top=False, weights='imagenet')
     base_model.trainable = True
     for layer in base_model.layers[:-50]:
@@ -255,24 +259,64 @@ def load_embedding_model():
     model.load_weights(weights_path)
     return model
 
-embedding_model = load_embedding_model()
+siamese_model = load_siamese_model()
 
-def get_embedding(face_img):
+def get_siamese_embedding(face_img):
     img_array = np.array(face_img.resize((128, 128))).astype("float32") / 255.0
     img_array = np.expand_dims(img_array, axis=0)
-    embedding = embedding_model.predict(img_array, verbose=0)[0]
+    embedding = siamese_model.predict(img_array, verbose=0)[0]
     norm = np.linalg.norm(embedding)
     if norm > 0:
         embedding = embedding / norm
     return embedding
 
+def get_deepface_embedding(face_img):
+    try:
+        result = DeepFace.represent(
+            img_path=np.array(face_img),
+            model_name="Facenet512",
+            detector_backend="skip",
+            enforce_detection=False
+        )
+        emb = np.array(result[0]["embedding"])
+        emb = emb / np.linalg.norm(emb)
+        return emb
+    except:
+        return None
+
 def cosine_distance(a, b):
     return 1 - np.dot(a, b)
 
 @st.cache_resource
-def load_reference_embeddings():
+def load_siamese_reference_embeddings():
     path = os.path.join(BASE_DIR, "reference_embeddings.npy")
     embeddings = np.load(path, allow_pickle=True).item()
+    return embeddings
+
+@st.cache_resource
+def load_deepface_reference_embeddings():
+    embeddings = {}
+    for student in os.listdir(REFERENCE_DIR):
+        student_path = os.path.join(REFERENCE_DIR, student)
+        if os.path.isdir(student_path):
+            student_embeddings = []
+            for file in os.listdir(student_path):
+                if file.lower().endswith((".jpg", ".jpeg", ".png", ".jfif")):
+                    img_path = os.path.join(student_path, file)
+                    try:
+                        result = DeepFace.represent(
+                            img_path=img_path,
+                            model_name="Facenet512",
+                            detector_backend="retinaface",
+                            enforce_detection=False
+                        )
+                        emb = np.array(result[0]["embedding"])
+                        emb = emb / np.linalg.norm(emb)
+                        student_embeddings.append(emb)
+                    except:
+                        pass
+            if student_embeddings:
+                embeddings[student] = student_embeddings
     return embeddings
 
 @st.cache_resource
@@ -287,7 +331,6 @@ def load_reference_photos():
                 photos[student] = Image.open(img_path).convert("RGB")
     return photos
 
-reference_embeddings = load_reference_embeddings()
 reference_photos = load_reference_photos()
 
 st.markdown("""
@@ -325,6 +368,19 @@ with st.sidebar:
         )
     else:
         st.markdown('<p style="color:#c0a898;font-size:12px;margin-top:8px;">Run a scan to enable export</p>', unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">psychology</span> Recognition Model</div>', unsafe_allow_html=True)
+    selected_model = st.radio(
+        "",
+        ["DeepFace (Facenet512)", "My Siamese Network"],
+        key="selected_model",
+        help="DeepFace: מודל מסחרי מוכח | My Siamese: הרשת שאימנתי"
+    )
+    if selected_model == "DeepFace (Facenet512)":
+        st.markdown('<p style="color:#9585b0;font-size:11px;margin-top:4px;">📡 Facenet512 · RetinaFace detection</p>', unsafe_allow_html=True)
+    else:
+        st.markdown('<p style="color:#9585b0;font-size:11px;margin-top:4px;">🧠 MobileNetV2 Siamese · Haar Cascade detection</p>', unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">manage_accounts</span> Manage Students</div>', unsafe_allow_html=True)
@@ -387,11 +443,12 @@ with st.sidebar:
                     save_roster(st.session_state.student_roster)
                 st.session_state.collected_photos = []
                 with st.spinner(f"Processing {new_name}'s photos..."):
-                    new_embeddings = []
+                    new_siamese_embs = []
+                    new_deepface_embs = []
                     for idx in range(len(photos_collected)):
                         img_path = os.path.join(student_dir, f"{new_name}_{idx+1}.jpg")
+                        # Siamese embedding
                         try:
-                            # חיתוך פנים עם OpenCV
                             img_bgr = cv2.imread(img_path)
                             img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
                             img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
@@ -403,23 +460,30 @@ with st.sidebar:
                                 face_pil = Image.fromarray(face_crop).convert("RGB")
                             else:
                                 face_pil = Image.open(img_path).convert("RGB")
-                            emb = get_embedding(face_pil)
-                            new_embeddings.append(emb)
+                            emb = get_siamese_embedding(face_pil)
+                            new_siamese_embs.append(emb)
                         except:
-                            try:
-                                img = Image.open(img_path).convert("RGB")
-                                emb = get_embedding(img)
-                                new_embeddings.append(emb)
-                            except:
-                                pass
-                    if new_embeddings:
-                        reference_embeddings[new_name] = new_embeddings
+                            pass
+                        # DeepFace embedding
+                        try:
+                            result = DeepFace.represent(img_path=img_path, model_name="Facenet512", detector_backend="retinaface", enforce_detection=False)
+                            emb = np.array(result[0]["embedding"])
+                            emb = emb / np.linalg.norm(emb)
+                            new_deepface_embs.append(emb)
+                        except:
+                            pass
+                    siamese_embeddings = load_siamese_reference_embeddings()
+                    deepface_embeddings = load_deepface_reference_embeddings()
+                    if new_siamese_embs:
+                        siamese_embeddings[new_name] = new_siamese_embs
+                    if new_deepface_embs:
+                        deepface_embeddings[new_name] = new_deepface_embs
                 st.success(f"✓ {new_name} added!")
                 st.rerun()
 
     st.markdown("---")
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">tune</span> Settings</div>', unsafe_allow_html=True)
-    threshold = st.slider("Detection threshold", 0.0, 1.0, 0.28)
+    threshold = st.slider("Detection threshold", 0.0, 1.0, 0.4 if st.session_state.selected_model == "DeepFace (Facenet512)" else 0.28)
     confidence = st.slider("Face confidence", 0.5, 1.0, 0.7)
 
 # ---- Mode tabs ----
@@ -475,7 +539,37 @@ def generate_class_image():
                     i += 1
     return np.array(bg_pil.convert("RGB")), present
 
-def extract_faces(image, confidence_threshold=0.7):
+def extract_faces_deepface(image, confidence_threshold=0.7):
+    img_rgb = np.array(image.convert("RGB"))
+    faces = []
+    try:
+        face_objs = DeepFace.extract_faces(
+            img_path=img_rgb,
+            detector_backend="retinaface",
+            enforce_detection=False,
+            align=True
+        )
+        for face_obj in face_objs:
+            if face_obj["confidence"] < confidence_threshold:
+                continue
+            region = face_obj["facial_area"]
+            x, y, w, h = region["x"], region["y"], region["w"], region["h"]
+            pad_x = int(0.2 * w)
+            pad_y = int(0.2 * h)
+            x1 = max(0, x - pad_x)
+            y1 = max(0, y - pad_y)
+            x2 = min(img_rgb.shape[1], x + w + pad_x)
+            y2 = min(img_rgb.shape[0], y + h + pad_y)
+            face = img_rgb[y1:y2, x1:x2]
+            if face.size == 0:
+                continue
+            face_img = Image.fromarray(face).resize((160, 160))
+            faces.append({"face": face_img, "box": (x1, y1, x2-x1, y2-y1)})
+    except Exception as e:
+        st.warning(f"Face detection error: {e}")
+    return faces, img_rgb
+
+def extract_faces_opencv(image, confidence_threshold=0.7):
     img_rgb = np.array(image.convert("RGB"))
     img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
     faces = []
@@ -492,8 +586,10 @@ def extract_faces(image, confidence_threshold=0.7):
         face_pil = Image.fromarray(face_crop).convert("RGB")
         faces.append({"face": face_pil, "box": (x1, y1, x2-x1, y2-y1)})
     return faces, img_rgb
-    
-def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.28):
+
+def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
+    use_deepface = st.session_state.selected_model == "DeepFace (Facenet512)"
+
     scan_placeholder = st.empty()
     scan_placeholder.markdown("""
     <div class="scan-container">
@@ -506,10 +602,18 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.28):
     """, unsafe_allow_html=True)
 
     progress = st.progress(0, text="Detecting faces...")
-    faces, original_img_rgb = extract_faces(image_pil, confidence_threshold)
+
+    if use_deepface:
+        faces, original_img_rgb = extract_faces_deepface(image_pil, confidence_threshold)
+        reference_embeddings = load_deepface_reference_embeddings()
+    else:
+        faces, original_img_rgb = extract_faces_opencv(image_pil, confidence_threshold)
+        reference_embeddings = load_siamese_reference_embeddings()
+
     if not reference_embeddings:
-        st.error("No reference embeddings found! Make sure reference_embeddings.npy is uploaded to the repo.")
-        return    
+        st.error("No reference embeddings found!")
+        return
+
     progress.progress(30, text="Analyzing faces...")
     scan_placeholder.empty()
 
@@ -521,13 +625,23 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.28):
         face_pil = data["face"]
         box = data["box"]
         progress.progress(30 + int(60 * i / total), text=f"Identifying face {i+1} of {len(faces)}...")
-        emb = get_embedding(face_pil)
+
+        if use_deepface:
+            emb = get_deepface_embedding(face_pil)
+        else:
+            emb = get_siamese_embedding(face_pil)
+
+        if emb is None:
+            continue
+
         avg_distances = {}
         for name, ref_embs in reference_embeddings.items():
             avg_distances[name] = min([cosine_distance(emb, r) for r in ref_embs])
+
         best_name, best_dist = min(avg_distances.items(), key=lambda x: x[1])
         if best_dist > threshold:
             best_name = None
+
         if best_name and best_name not in present_students:
             present_students[best_name] = {"img": face_pil, "unknown": False}
             recognized_faces.append({"name": best_name, "box": box, "dist": best_dist, "unknown": False})
