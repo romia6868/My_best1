@@ -304,7 +304,8 @@ def load_deepface_reference_embeddings():
                 if file.lower().endswith((".jpg", ".jpeg", ".png", ".jfif")):
                     img_path = os.path.join(student_path, file)
                     try:
-                        img = np.array(Image.open(img_path).convert("RGB"))
+                        img = cv2.imread(img_path)
+                        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                         result = DeepFace.represent(
                             img_path=img,
                             model_name="Facenet512",
@@ -315,11 +316,10 @@ def load_deepface_reference_embeddings():
                         emb = emb / np.linalg.norm(emb)
                         student_embeddings.append(emb)
                     except Exception as e:
-                        st.warning(f"Failed {file}: {e}")
+                        pass
             if student_embeddings:
                 embeddings[student] = student_embeddings
     return embeddings
-
 @st.cache_resource
 def load_reference_photos():
     photos = {}
