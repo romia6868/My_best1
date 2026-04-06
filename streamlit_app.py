@@ -304,8 +304,9 @@ def load_deepface_reference_embeddings():
                 if file.lower().endswith((".jpg", ".jpeg", ".png", ".jfif")):
                     img_path = os.path.join(student_path, file)
                     try:
+                        img = np.array(Image.open(img_path).convert("RGB"))
                         result = DeepFace.represent(
-                            img_path=img_path,
+                            img_path=img,
                             model_name="Facenet512",
                             detector_backend="retinaface",
                             enforce_detection=False
@@ -317,7 +318,6 @@ def load_deepface_reference_embeddings():
                         st.warning(f"Failed {file}: {e}")
             if student_embeddings:
                 embeddings[student] = student_embeddings
-                st.write(f"✓ {student}: {len(student_embeddings)}")
     return embeddings
 
 @st.cache_resource
