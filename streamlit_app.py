@@ -639,8 +639,11 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
         avg_distances = {}
         for name, ref_embs in reference_embeddings.items():
-            avg_distances[name] = min([cosine_distance(emb, r) for r in ref_embs])
-
+                dist = min([cosine_distance(emb, r) for r in ref_embs])
+                avg_distances[name] = dist
+        st.write(f"Distances: {avg_distances}")
+        st.write(f"Best: {best_name} = {best_dist:.4f}, threshold={threshold}")
+      
         best_name, best_dist = min(avg_distances.items(), key=lambda x: x[1])
         if best_dist > threshold:
             best_name = None
