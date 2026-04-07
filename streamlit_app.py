@@ -590,7 +590,12 @@ def extract_faces_deepface(image, confidence_threshold=0.7):
         faces.append({"face": face_pil, "box": (x1, y1, x2-x1, y2-y1)})
     return faces, img_rgb
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
+    # ✅ תיקון: אם מגיע tuple, קח את האלמנט הראשון
+    if isinstance(image_pil, tuple):
+        image_pil = image_pil[0]
+    
     scan_placeholder = st.empty()
+
     scan_placeholder.markdown("""
     <div class="scan-container">
       <div class="scan-overlay"><div class="scan-line"></div></div>
