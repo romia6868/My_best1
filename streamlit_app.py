@@ -637,17 +637,17 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         if emb is None:
             continue
 
-        avg_distances = {}
+         avg_distances = {}
         for name, ref_embs in reference_embeddings.items():
-                dist = min([cosine_distance(emb, r) for r in ref_embs])
-                avg_distances[name] = dist
+            dist = min([cosine_distance(emb, r) for r in ref_embs])
+            avg_distances[name] = dist
+    
+        best_name, best_dist = min(avg_distances.items(), key=lambda x: x[1])
         st.write(f"Distances: {avg_distances}")
         st.write(f"Best: {best_name} = {best_dist:.4f}, threshold={threshold}")
-      
-        best_name, best_dist = min(avg_distances.items(), key=lambda x: x[1])
+
         if best_dist > threshold:
             best_name = None
-
         if best_name and best_name not in present_students:
             present_students[best_name] = {"img": face_pil, "unknown": False}
             recognized_faces.append({"name": best_name, "box": box, "dist": best_dist, "unknown": False})
