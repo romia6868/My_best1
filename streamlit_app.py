@@ -14,7 +14,7 @@ from io import BytesIO
 import tensorflow as tf
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras import layers, models
-
+st.cache_resource.clear()
 st.set_page_config(
     page_title="Smart Attendance",
     layout="wide",
@@ -589,10 +589,7 @@ def extract_faces_deepface(image, confidence_threshold=0.7):
         face_pil = Image.fromarray(face_crop).convert("RGB")
         faces.append({"face": face_pil, "box": (x1, y1, x2-x1, y2-y1)})
     return faces, img_rgb
-
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
-    use_deepface = st.session_state.selected_model == "DeepFace (Facenet512)"
-
     scan_placeholder = st.empty()
     scan_placeholder.markdown("""
     <div class="scan-container">
@@ -605,17 +602,36 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     """, unsafe_allow_html=True)
 
     progress = st.progress(0, text="Detecting faces...")
-
-    if use_deepface:
-        faces, original_img_rgb = extract_faces_deepface(image_pil, confidence_threshold)
-        reference_embeddings = load_deepface_reference_embeddings()
-    else:
-        faces, original_img_rgb = extract_faces_opencv(image_pil, confidence_threshold)
-        reference_embeddings = load_siamese_reference_embeddings()
-
-    if not reference_embeddings:
-        st.error("No reference embeddings found!")
-        return
+    
+    # ✅ תיקון: RetinaFace + align=True כמו במקורי
+    img_rgb = np.array(image_pil.convert("RGB"))
+    faces = []
+    try:
+        face_objs = DeepFace.extract_faces(
+            img_path=img_rgb,
+            detector_backend="retinaface",
+            enforce_detection=False,
+            align=True
+        )
+        for face_obj in face_objs:
+            if face_obj["confidence"] < confidence_threshold:
+                continue
+            region = face_obj["facial_area"]
+            x, y, w, h = region["x"], region["y"], region["w"], region["h"]
+            pad_x = int(0.2 * w)
+            pad_y = int(0.2 * h)
+            x1 = max(0, x - pad_x)
+            y1 = max(0, y - pad_y)
+            x2 = min(img_rgb.shape[1], x + w + pad_x)
+            y2 = min(img_rgb.shape[0], y + h + pad_y)
+            face = img_rgb[y1:y2, x1:x2]
+            if face.size == 0:
+                continue
+            # ✅ תיקון: resize ל-160x160 כמו במקורי
+            face_img = Image.fromarray(face).resize((160, 160))
+            faces.append({"face": face_img, "box": (x1, y1, x2-x1, y2-y1)})
+    except Exception as e:
+        st.warning(f"Face detection error: {e}")
 
     progress.progress(30, text="Analyzing faces...")
     scan_placeholder.empty()
@@ -625,37 +641,38 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     total = max(len(faces), 1)
 
     for i, data in enumerate(faces):
-        face_pil = data["face"]
+        img = data["face"]
         box = data["box"]
         progress.progress(30 + int(60 * i / total), text=f"Identifying face {i+1} of {len(faces)}...")
-
-        if use_deepface:
-            emb = get_deepface_embedding(face_pil)
-        else:
-            emb = get_siamese_embedding(face_pil)
-
-        if emb is None:
+        try:
+            result = DeepFace.represent(
+                img_path=np.array(img),
+                model_name="Facenet512",
+                detector_backend="skip",
+                enforce_detection=False
+            )
+            emb = np.array(result[0]["embedding"])
+            emb = emb / np.linalg.norm(emb)
+        except:
             continue
+
         avg_distances = {}
-      
         for name, ref_embs in reference_embeddings.items():
-            dist = min([cosine_distance(emb, r) for r in ref_embs])
-            avg_distances[name] = dist
-    
+            avg_distances[name] = min([cosine_distance(emb, r) for r in ref_embs])
+
         best_name, best_dist = min(avg_distances.items(), key=lambda x: x[1])
-        st.write(f"Distances: {avg_distances}")
-        st.write(f"Best: {best_name} = {best_dist:.4f}, threshold={threshold}")
 
         if best_dist > threshold:
             best_name = None
+
         if best_name and best_name not in present_students:
-            present_students[best_name] = {"img": face_pil, "unknown": False}
+            present_students[best_name] = {"img": img, "unknown": False}
             recognized_faces.append({"name": best_name, "box": box, "dist": best_dist, "unknown": False})
         elif best_name is None:
             unknown_key = f"Unknown_{i}"
-            present_students[unknown_key] = {"img": face_pil, "unknown": True}
+            present_students[unknown_key] = {"img": img, "unknown": True}
             recognized_faces.append({"name": "Unknown", "box": box, "dist": 1.0, "unknown": True})
-
+    
     progress.progress(100, text="Done!")
     progress.empty()
 
