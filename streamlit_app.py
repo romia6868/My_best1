@@ -602,9 +602,11 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     """, unsafe_allow_html=True)
 
     progress = st.progress(0, text="Detecting faces...")
-    
+
+        face_objs = DeepFace.extract_faces(
     # ✅ תיקון: RetinaFace + align=True כמו במקורי
     img_rgb = np.array(image_pil.convert("RGB"))
+    original_img_rgb = img_rgb
     faces = []
     try:
         face_objs = DeepFace.extract_faces(
