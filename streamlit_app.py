@@ -603,8 +603,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
     progress = st.progress(0, text="Detecting faces...")
 
-        face_objs = DeepFace.extract_faces(
-    # ✅ תיקון: RetinaFace + align=True כמו במקורי
     img_rgb = np.array(image_pil.convert("RGB"))
     original_img_rgb = img_rgb
     faces = []
@@ -629,7 +627,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             face = img_rgb[y1:y2, x1:x2]
             if face.size == 0:
                 continue
-            # ✅ תיקון: resize ל-160x160 כמו במקורי
             face_img = Image.fromarray(face).resize((160, 160))
             faces.append({"face": face_img, "box": (x1, y1, x2-x1, y2-y1)})
     except Exception as e:
@@ -674,10 +671,10 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             unknown_key = f"Unknown_{i}"
             present_students[unknown_key] = {"img": img, "unknown": True}
             recognized_faces.append({"name": "Unknown", "box": box, "dist": 1.0, "unknown": True})
-    
+
     progress.progress(100, text="Done!")
     progress.empty()
-
+  
     st.markdown(f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;">{len(faces)} faces detected</p>', unsafe_allow_html=True)
 
     img_draw = Image.fromarray(original_img_rgb)
