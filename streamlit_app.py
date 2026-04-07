@@ -636,8 +636,8 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
         if emb is None:
             continue
-
-         avg_distances = {}
+        avg_distances = {}
+      
         for name, ref_embs in reference_embeddings.items():
             dist = min([cosine_distance(emb, r) for r in ref_embs])
             avg_distances[name] = dist
