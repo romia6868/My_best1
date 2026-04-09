@@ -256,12 +256,12 @@ if "student_roster" not in st.session_state:
 
 STUDENT_ROSTER = st.session_state.student_roster
 
-@st.cache_resource
+
 def load_siamese_model():
     try:
         import tensorflow as tf
         from tensorflow.keras import layers, models
-        from tensorflow.keras.applications import MobileNetV2
+        from tensorflow.keras.applications import MobileNetV2, mobilenet_v2
 
         IMG_SHAPE = (128, 128, 3)
 
@@ -269,7 +269,7 @@ def load_siamese_model():
             base_model = MobileNetV2(
                 input_shape=IMG_SHAPE,
                 include_top=False,
-                weights='imagenet'   # ❗ חשוב מאוד
+                weights='imagenet'
             )
 
             base_model.trainable = True
@@ -277,6 +277,7 @@ def load_siamese_model():
                 layer.trainable = False
 
             model = models.Sequential([
+                layers.Lambda(mobilenet_v2.preprocess_input),   # ❗ חובה
                 base_model,
                 layers.GlobalAveragePooling2D(),
                 layers.Dense(512, activation='relu'),
@@ -619,13 +620,16 @@ def cosine_distance(a, b):
 def euclidean_distance(a, b):
     return float(np.linalg.norm(a - b))
 
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+
 def get_embedding_siamese(face_img):
-    """מחלץ embedding עם הרשת הסיאמית"""
     img = face_img.convert("RGB").resize((128, 128))
-    img_arr = np.array(img, dtype=np.float32) / 255.0
+    img_arr = np.array(img, dtype=np.float32)
+    img_arr = preprocess_input(img_arr)   # ❗ חובה
     img_arr = np.expand_dims(img_arr, axis=0)
     emb = siamese_model.predict(img_arr, verbose=0)[0]
     return emb
+
 
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     use_siamese = (
