@@ -1,4 +1,13 @@
+import sys
+import os
 
+try:
+    import cv2
+    print("cv2 OK:", cv2.__version__)
+except Exception as e:
+    print("cv2 FULL ERROR:", repr(e))
+    import traceback
+    traceback.print_exc()
 import streamlit as st
 from deepface import DeepFace
 from PIL import Image, ImageOps, ImageDraw, ImageFont
@@ -12,10 +21,7 @@ import json
 from datetime import datetime
 import pandas as pd
 from io import BytesIO
-import tensorflow as tf
-from tensorflow.keras.applications import MobileNetV2
-from tensorflow.keras import layers, models
-st.cache_resource.clear()
+
 st.set_page_config(
     page_title="Smart Attendance",
     layout="wide",
@@ -30,70 +36,76 @@ if "last_results" not in st.session_state:
     st.session_state.last_results = None
 if "absence_counter" not in st.session_state:
     st.session_state.absence_counter = {}
-if "selected_model" not in st.session_state:
-    st.session_state.selected_model = "DeepFace (Facenet512)"
 
 ABSENCE_THRESHOLD = 3
-
 css = """
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"/>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"/>
 <style>
 * { font-family: 'Space Grotesk', sans-serif !important; }
 .material-symbols-outlined {
-  font-family: 'Material Symbols Outlined' !important;
-  font-weight: normal; font-style: normal; font-size: 22px; line-height: 1;
-  letter-spacing: normal; text-transform: none; display: inline-block;
-  white-space: nowrap; -webkit-font-feature-settings: 'liga';
-  font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased;
+    font-family: 'Material Symbols Outlined' !important;
+    font-weight: normal; font-style: normal; font-size: 22px;
+    line-height: 1; letter-spacing: normal; text-transform: none;
+    display: inline-block; white-space: nowrap;
+    -webkit-font-feature-settings: 'liga'; font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
 }
 @keyframes pulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 #b8a9c940; }
-  50% { transform: scale(1.06); box-shadow: 0 0 0 8px #b8a9c900; }
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 #b8a9c940; }
+    50% { transform: scale(1.06); box-shadow: 0 0 0 8px #b8a9c900; }
 }
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 @keyframes shimmer {
-  0% { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
+    0% { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
 }
 @keyframes progressFill { from { width: 0%; } }
 @keyframes scanLine {
-  0% { top: 0%; opacity: 1; }
-  100% { top: 100%; opacity: 0.3; }
+    0% { top: 0%; opacity: 1; }
+    100% { top: 100%; opacity: 0.3; }
 }
-.stApp { background: #f0eef4 !important; }
+.stApp {
+    background: #f0eef4 !important;
+}
 .main-header {
-  display: flex; align-items: center; gap: 14px;
-  padding: 1.5rem 0 1rem; border-bottom: 1px solid #e4dff0; margin-bottom: 1.5rem;
+    display: flex; align-items: center; gap: 14px;
+    padding: 1.5rem 0 1rem;
+    border-bottom: 1px solid #e4dff0;
+    margin-bottom: 1.5rem;
 }
 .header-icon {
-  width: 52px; height: 52px;
-  background: linear-gradient(135deg, #b8a9c9, #9585b0);
-  border-radius: 14px; display: flex; align-items: center; justify-content: center;
-  animation: pulse 3s ease-in-out infinite;
+    width: 52px; height: 52px;
+    background: linear-gradient(135deg, #b8a9c9, #9585b0);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    animation: pulse 3s ease-in-out infinite;
 }
 .header-icon .material-symbols-outlined { font-size: 28px; color: white; }
 .header-title {
-  font-size: 28px; font-weight: 700;
-  background: linear-gradient(90deg, #6b5a8a, #9585b0, #c4b8d8);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    font-size: 28px; font-weight: 700;
+    background: linear-gradient(90deg, #6b5a8a, #9585b0, #c4b8d8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
 .scan-container { position: relative; display: inline-block; width: 100%; }
 .scan-overlay {
-  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-  pointer-events: none; z-index: 10; border-radius: 8px; overflow: hidden;
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; z-index: 10; border-radius: 8px; overflow: hidden;
 }
 .scan-line {
-  position: absolute; left: 0; right: 0; height: 3px;
-  background: linear-gradient(90deg, transparent, #b8a9c9, #c4b8d8, #b8a9c9, transparent);
-  animation: scanLine 1.5s ease-in-out infinite; box-shadow: 0 0 12px #b8a9c980;
+    position: absolute; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent, #b8a9c9, #c4b8d8, #b8a9c9, transparent);
+    animation: scanLine 1.5s ease-in-out infinite;
+    box-shadow: 0 0 12px #b8a9c980;
 }
 .upload-zone {
-  border: 1.5px dashed #c4b8d8; border-radius: 14px; padding: 2.5rem;
-  text-align: center; background: #ebe8f240; margin-bottom: 1rem; transition: all 0.2s;
+    border: 1.5px dashed #c4b8d8;
+    border-radius: 14px; padding: 2.5rem;
+    text-align: center; background: #ebe8f240;
+    margin-bottom: 1rem; transition: all 0.2s;
 }
 .upload-zone:hover { border-color: #9585b0; background: #ebe8f260; }
 .upload-zone .material-symbols-outlined { font-size: 44px; color: #9585b0; }
@@ -101,19 +113,20 @@ css = """
 .upload-sub { font-size: 12px; color: #a098b8; }
 .stat-row { display: flex; gap: 12px; margin: 1.5rem 0; }
 .stat-card {
-  flex: 1; background: #fff; border: 1px solid #e4dff0;
-  border-radius: 12px; padding: 16px 18px; transition: all 0.2s;
-  position: relative; overflow: hidden;
+    flex: 1; background: #fff;
+    border: 1px solid #e4dff0;
+    border-radius: 12px; padding: 16px 18px;
+    transition: all 0.2s; position: relative; overflow: hidden;
 }
 .stat-card::after {
-  content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-  background: linear-gradient(90deg, transparent, #ebe8f230, transparent);
-  background-size: 400px 100%; animation: shimmer 2.5s infinite;
+    content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, #ebe8f230, transparent);
+    background-size: 400px 100%; animation: shimmer 2.5s infinite;
 }
 .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px #b8a9c920; border-color: #c4b8d8; }
 .stat-label {
-  font-size: 11px; color: #a098b8; text-transform: uppercase; letter-spacing: 0.5px;
-  display: flex; align-items: center; gap: 5px; margin-bottom: 6px;
+    font-size: 11px; color: #a098b8; text-transform: uppercase; letter-spacing: 0.5px;
+    display: flex; align-items: center; gap: 5px; margin-bottom: 6px;
 }
 .stat-label .material-symbols-outlined { font-size: 14px; }
 .stat-val { font-size: 28px; font-weight: 700; }
@@ -125,10 +138,7 @@ css = """
 .progress-bar { height: 100%; background: linear-gradient(90deg, #b8a9c9, #c4b8d8); border-radius: 8px; animation: progressFill 1.5s ease-out forwards; }
 .section-divider { display: flex; align-items: center; gap: 12px; margin: 1.8rem 0 1.2rem; }
 .divider-line { flex: 1; height: 1px; background: #e4dff0; }
-.divider-badge {
-  font-size: 12px; padding: 4px 14px; border-radius: 20px; font-weight: 600;
-  display: flex; align-items: center; gap: 5px;
-}
+.divider-badge { font-size: 12px; padding: 4px 14px; border-radius: 20px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
 .divider-badge .material-symbols-outlined { font-size: 15px; }
 .badge-present { background: #68b88a20; color: #68b88a; }
 .badge-absent { background: #d4707a20; color: #d4707a; }
@@ -140,16 +150,15 @@ css = """
 .student-card:nth-child(4) { animation-delay: 0.20s; }
 .student-card:nth-child(5) { animation-delay: 0.25s; }
 [data-testid="stSidebar"] { background: #e8e4f0 !important; border-right: 1px solid #e4dff0 !important; }
-.sidebar-title {
-  font-size: 15px; font-weight: 700; color: #4a3a6a; margin-bottom: 1rem;
-  display: flex; align-items: center; gap: 6px;
-}
+.sidebar-title { font-size: 15px; font-weight: 700; color: #4a3a6a; margin-bottom: 1rem; display: flex; align-items: center; gap: 6px; }
 .sidebar-title .material-symbols-outlined { font-size: 18px; color: #9585b0; }
 .sidebar-student {
-  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
-  background: #f0eef4; border-radius: 8px; margin-bottom: 6px;
-  font-size: 13px; color: #4a3a6a; border: 1px solid #e4dff0;
-  transition: all 0.2s; cursor: default;
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; background: #f0eef4;
+    border-radius: 8px; margin-bottom: 6px;
+    font-size: 13px; color: #4a3a6a;
+    border: 1px solid #e4dff0;
+    transition: all 0.2s; cursor: default;
 }
 .sidebar-student:hover { border-color: #b8a9c9; transform: translateX(4px); box-shadow: 2px 0 8px #b8a9c920; }
 .sidebar-student .material-symbols-outlined { font-size: 16px; color: #9585b0; }
@@ -164,33 +173,52 @@ css = """
 button_css = """
 <style>
 .stButton > button {
-  background: #ebe8f2 !important; color: #4a3a6a !important;
-  border: 1.5px solid #e4dff0 !important; border-radius: 10px !important;
-  padding: 11px 16px !important; font-size: 14px !important; font-weight: 500 !important;
-  width: 100% !important; transition: all 0.2s !important;
-  font-family: 'Space Grotesk', sans-serif !important; margin-top: 0 !important;
+    background: #ebe8f2 !important;
+    color: #4a3a6a !important;
+    border: 1.5px solid #e4dff0 !important;
+    border-radius: 10px !important;
+    padding: 11px 16px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    width: 100% !important;
+    transition: all 0.2s !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+    margin-top: 0 !important;
 }
 .stButton > button:hover {
-  border-color: #9585b0 !important; transform: translateY(-2px) !important;
-  box-shadow: 0 4px 12px #b8a9c930 !important;
+    border-color: #9585b0 !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px #b8a9c930 !important;
 }
 .stButton > button[kind="primary"] {
-  background: linear-gradient(135deg, #b8a9c9, #9585b0) !important;
-  color: white !important; border: none !important;
-  box-shadow: 0 4px 14px #b8a9c940 !important;
-  padding: 13px 28px !important; font-size: 15px !important;
-  font-weight: 600 !important; margin-top: 12px !important;
+    background: linear-gradient(135deg, #b8a9c9, #9585b0) !important;
+    color: white !important;
+    border: none !important;
+    box-shadow: 0 4px 14px #b8a9c940 !important;
+    padding: 13px 28px !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    margin-top: 12px !important;
 }
 .stButton > button[kind="primary"]:hover {
-  filter: brightness(1.08) !important; transform: translateY(-2px) !important;
+    filter: brightness(1.08) !important;
+    transform: translateY(-2px) !important;
 }
 .stDownloadButton > button {
-  background: #ebe8f2 !important; color: #9585b0 !important;
-  border: 1.5px solid #b8a9c9 !important; border-radius: 10px !important;
-  font-size: 13px !important; font-weight: 600 !important; width: 100% !important;
-  transition: all 0.2s !important; margin-top: 8px !important;
+    background: #ebe8f2 !important;
+    color: #9585b0 !important;
+    border: 1.5px solid #b8a9c9 !important;
+    border-radius: 10px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    width: 100% !important;
+    transition: all 0.2s !important;
+    margin-top: 8px !important;
 }
-.stDownloadButton > button:hover { background: #e4dff0 !important; transform: translateY(-1px) !important; }
+.stDownloadButton > button:hover {
+    background: #e4dff0 !important;
+    transform: translateY(-1px) !important;
+}
 </style>
 """
 
@@ -200,7 +228,6 @@ st.markdown(button_css, unsafe_allow_html=True)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ZIP_PATH = os.path.join(BASE_DIR, "My_Classmates_small.zip")
 EXTRACT_PATH = os.path.join(BASE_DIR, "My_Classmates")
-
 if not os.path.exists(EXTRACT_PATH):
     with zipfile.ZipFile(ZIP_PATH, 'r') as zip_ref:
         zip_ref.extractall(EXTRACT_PATH)
@@ -240,75 +267,19 @@ if "student_roster" not in st.session_state:
 
 STUDENT_ROSTER = st.session_state.student_roster
 
-# ---- טעינת המודל הסיאמי ----
 @st.cache_resource
-def load_siamese_model():
-    base_model = MobileNetV2(input_shape=(128, 128, 3), include_top=False, weights='imagenet')
-    base_model.trainable = True
-    for layer in base_model.layers[:-50]:
-        layer.trainable = False
-    model = models.Sequential([
-        base_model,
-        layers.GlobalAveragePooling2D(),
-        layers.Dense(512, activation='relu'),
-        layers.BatchNormalization(),
-        layers.Dropout(0.3),
-        layers.Dense(256, activation='relu'),
-        layers.Dense(128, activation=None),
-    ], name="MobileNetV2_Siamese_Pro")
-    weights_path = os.path.join(BASE_DIR, "my_siamese3_weights.weights.h5")
-    model.load_weights(weights_path)
-    return model
-
-siamese_model = load_siamese_model()
-
-def get_siamese_embedding(face_img):
-    img_array = np.array(face_img.resize((128, 128))).astype("float32") / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
-    embedding = siamese_model.predict(img_array, verbose=0)[0]
-    norm = np.linalg.norm(embedding)
-    if norm > 0:
-        embedding = embedding / norm
-    return embedding
-
-def get_deepface_embedding(face_img):
-    try:
-        result = DeepFace.represent(
-            img_path=np.array(face_img),
-            model_name="Facenet512",
-            detector_backend="skip",
-            enforce_detection=False
-        )
-        emb = np.array(result[0]["embedding"])
-        emb = emb / np.linalg.norm(emb)
-        return emb
-    except:
-        return None
-
-def cosine_distance(a, b):
-    return 1 - np.dot(a, b)
-
-@st.cache_resource
-def load_siamese_reference_embeddings():
-    path = os.path.join(BASE_DIR, "reference_embeddings.npy")
-    embeddings = np.load(path, allow_pickle=True).item()
-    return embeddings
-
-@st.cache_resource
-def load_deepface_reference_embeddings():
+def load_reference_embeddings():
     embeddings = {}
     for student in os.listdir(REFERENCE_DIR):
         student_path = os.path.join(REFERENCE_DIR, student)
         if os.path.isdir(student_path):
             student_embeddings = []
             for file in os.listdir(student_path):
-                if file.lower().endswith((".jpg", ".jpeg", ".png", ".jfif")):
+                if file.lower().endswith((".jpg",".jpeg",".png",".jfif")):
                     img_path = os.path.join(student_path, file)
                     try:
-                        img = cv2.imread(img_path)
-                        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                         result = DeepFace.represent(
-                            img_path=img,
+                            img_path=img_path,
                             model_name="Facenet512",
                             detector_backend="retinaface",
                             enforce_detection=False
@@ -316,33 +287,36 @@ def load_deepface_reference_embeddings():
                         emb = np.array(result[0]["embedding"])
                         emb = emb / np.linalg.norm(emb)
                         student_embeddings.append(emb)
-                    except Exception as e:
+                    except:
                         pass
             if student_embeddings:
                 embeddings[student] = student_embeddings
     return embeddings
+
 @st.cache_resource
 def load_reference_photos():
     photos = {}
     for student in STUDENT_ROSTER:
         student_path = os.path.join(REFERENCE_DIR, student)
         if os.path.isdir(student_path):
-            files = [f for f in os.listdir(student_path) if f.lower().endswith((".jpg",".jpeg",".png",".jfif"))]
+            files = [f for f in os.listdir(student_path)
+                     if f.lower().endswith((".jpg",".jpeg",".png",".jfif"))]
             if files:
                 img_path = os.path.join(student_path, files[0])
                 photos[student] = Image.open(img_path).convert("RGB")
     return photos
 
+reference_embeddings = load_reference_embeddings()
 reference_photos = load_reference_photos()
 
 st.markdown("""
 <div class="main-header">
-  <div class="header-icon">
-    <span class="material-symbols-outlined">face_unlock</span>
-  </div>
-  <div>
-    <div class="header-title">Smart Attendance</div>
-  </div>
+    <div class="header-icon">
+        <span class="material-symbols-outlined">face_unlock</span>
+    </div>
+    <div>
+        <div class="header-title">Smart Attendance</div>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -370,19 +344,6 @@ with st.sidebar:
         )
     else:
         st.markdown('<p style="color:#c0a898;font-size:12px;margin-top:8px;">Run a scan to enable export</p>', unsafe_allow_html=True)
-
-    st.markdown("---")
-    st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">psychology</span> Recognition Model</div>', unsafe_allow_html=True)
-    selected_model = st.radio(
-        "",
-        ["DeepFace (Facenet512)", "My Siamese Network"],
-        key="selected_model",
-        help="DeepFace: מודל מסחרי מוכח | My Siamese: הרשת שאימנתי"
-    )
-    if selected_model == "DeepFace (Facenet512)":
-        st.markdown('<p style="color:#9585b0;font-size:11px;margin-top:4px;">📡 Facenet512 · RetinaFace detection</p>', unsafe_allow_html=True)
-    else:
-        st.markdown('<p style="color:#9585b0;font-size:11px;margin-top:4px;">🧠 MobileNetV2 Siamese · Haar Cascade detection</p>', unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">manage_accounts</span> Manage Students</div>', unsafe_allow_html=True)
@@ -432,8 +393,7 @@ with st.sidebar:
             can_save = len(photos_collected) >= 5
             if st.button(
                 "Save student" if can_save else f"Need {max(0, 5-len(photos_collected))} more",
-                key="save_student",
-                disabled=not can_save
+                key="save_student", disabled=not can_save
             ):
                 student_dir = os.path.join(REFERENCE_DIR, new_name)
                 os.makedirs(student_dir, exist_ok=True)
@@ -445,47 +405,24 @@ with st.sidebar:
                     save_roster(st.session_state.student_roster)
                 st.session_state.collected_photos = []
                 with st.spinner(f"Processing {new_name}'s photos..."):
-                    new_siamese_embs = []
-                    new_deepface_embs = []
+                    new_embeddings = []
                     for idx in range(len(photos_collected)):
                         img_path = os.path.join(student_dir, f"{new_name}_{idx+1}.jpg")
-                        # Siamese embedding
-                        try:
-                            img_bgr = cv2.imread(img_path)
-                            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-                            img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
-                            face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-                            detected = face_cascade.detectMultiScale(img_gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
-                            if len(detected) > 0:
-                                x, y, w, h = detected[0]
-                                face_crop = img_rgb[y:y+h, x:x+w]
-                                face_pil = Image.fromarray(face_crop).convert("RGB")
-                            else:
-                                face_pil = Image.open(img_path).convert("RGB")
-                            emb = get_siamese_embedding(face_pil)
-                            new_siamese_embs.append(emb)
-                        except:
-                            pass
-                        # DeepFace embedding
                         try:
                             result = DeepFace.represent(img_path=img_path, model_name="Facenet512", detector_backend="retinaface", enforce_detection=False)
                             emb = np.array(result[0]["embedding"])
                             emb = emb / np.linalg.norm(emb)
-                            new_deepface_embs.append(emb)
+                            new_embeddings.append(emb)
                         except:
                             pass
-                    siamese_embeddings = load_siamese_reference_embeddings()
-                    deepface_embeddings = load_deepface_reference_embeddings()
-                    if new_siamese_embs:
-                        siamese_embeddings[new_name] = new_siamese_embs
-                    if new_deepface_embs:
-                        deepface_embeddings[new_name] = new_deepface_embs
+                    if new_embeddings:
+                        reference_embeddings[new_name] = new_embeddings
                 st.success(f"✓ {new_name} added!")
                 st.rerun()
 
     st.markdown("---")
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">tune</span> Settings</div>', unsafe_allow_html=True)
-    threshold = st.slider("Detection threshold", 0.0, 1.0, 0.4 if st.session_state.selected_model == "DeepFace (Facenet512)" else 0.28)
+    threshold = st.slider("Detection threshold", 0.0, 1.0, 0.4)
     confidence = st.slider("Face confidence", 0.5, 1.0, 0.7)
 
 # ---- Mode tabs ----
@@ -541,7 +478,7 @@ def generate_class_image():
                     i += 1
     return np.array(bg_pil.convert("RGB")), present
 
-def extract_faces_deepface(image, confidence_threshold=0.7):
+def extract_faces(image, confidence_threshold=0.7):
     img_rgb = np.array(image.convert("RGB"))
     faces = []
     try:
@@ -571,73 +508,23 @@ def extract_faces_deepface(image, confidence_threshold=0.7):
         st.warning(f"Face detection error: {e}")
     return faces, img_rgb
 
-def extract_faces_deepface(image, confidence_threshold=0.7):
-    if isinstance(image, tuple):
-        image = image[0]
-    img_rgb = np.array(image.convert("RGB"))
-    img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
-    faces = []
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    detected = face_cascade.detectMultiScale(img_gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
-    for (x, y, w, h) in detected:
-        pad_x = int(0.2 * w)
-        pad_y = int(0.2 * h)
-        x1 = max(0, x - pad_x)
-        y1 = max(0, y - pad_y)
-        x2 = min(img_rgb.shape[1], x + w + pad_x)
-        y2 = min(img_rgb.shape[0], y + h + pad_y)
-        face_crop = img_rgb[y1:y2, x1:x2]
-        face_pil = Image.fromarray(face_crop).convert("RGB")
-        faces.append({"face": face_pil, "box": (x1, y1, x2-x1, y2-y1)})
-    return faces, img_rgb
-def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
-    # ✅ תיקון: אם מגיע tuple, קח את האלמנט הראשון
-    if isinstance(image_pil, tuple):
-        image_pil = image_pil[0]
-    
-    scan_placeholder = st.empty()
+def cosine_distance(a, b):
+    return 1 - np.dot(a, b)
 
+def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
+    scan_placeholder = st.empty()
     scan_placeholder.markdown("""
     <div class="scan-container">
-      <div class="scan-overlay"><div class="scan-line"></div></div>
-      <div style="background:#c9956615;border-radius:8px;padding:2rem;text-align:center;">
-        <span class="material-symbols-outlined" style="font-size:48px;color:#c99566;">document_scanner</span>
-        <p style="color:#b09080;margin-top:8px;font-size:14px;">Scanning photo...</p>
-      </div>
+        <div class="scan-overlay"><div class="scan-line"></div></div>
+        <div style="background:#c9956615;border-radius:8px;padding:2rem;text-align:center;">
+            <span class="material-symbols-outlined" style="font-size:48px;color:#c99566;">document_scanner</span>
+            <p style="color:#b09080;margin-top:8px;font-size:14px;">Scanning photo...</p>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
     progress = st.progress(0, text="Detecting faces...")
-
-    img_rgb = np.array(image_pil.convert("RGB"))
-    original_img_rgb = img_rgb
-    faces = []
-    try:
-        face_objs = DeepFace.extract_faces(
-            img_path=img_rgb,
-            detector_backend="retinaface",
-            enforce_detection=False,
-            align=True
-        )
-        for face_obj in face_objs:
-            if face_obj["confidence"] < confidence_threshold:
-                continue
-            region = face_obj["facial_area"]
-            x, y, w, h = region["x"], region["y"], region["w"], region["h"]
-            pad_x = int(0.2 * w)
-            pad_y = int(0.2 * h)
-            x1 = max(0, x - pad_x)
-            y1 = max(0, y - pad_y)
-            x2 = min(img_rgb.shape[1], x + w + pad_x)
-            y2 = min(img_rgb.shape[0], y + h + pad_y)
-            face = img_rgb[y1:y2, x1:x2]
-            if face.size == 0:
-                continue
-            face_img = Image.fromarray(face).resize((160, 160))
-            faces.append({"face": face_img, "box": (x1, y1, x2-x1, y2-y1)})
-    except Exception as e:
-        st.warning(f"Face detection error: {e}")
-
+    faces, original_img_rgb = extract_faces(image_pil, confidence_threshold)
     progress.progress(30, text="Analyzing faces...")
     scan_placeholder.empty()
 
@@ -666,7 +553,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             avg_distances[name] = min([cosine_distance(emb, r) for r in ref_embs])
 
         best_name, best_dist = min(avg_distances.items(), key=lambda x: x[1])
-
         if best_dist > threshold:
             best_name = None
 
@@ -680,13 +566,14 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
     progress.progress(100, text="Done!")
     progress.empty()
-  
+
     st.markdown(f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;">{len(faces)} faces detected</p>', unsafe_allow_html=True)
 
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
     font_name = font_conf = None
-    for path in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]:
+    for path in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                 "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]:
         if os.path.exists(path):
             font_name = ImageFont.truetype(path, 32)
             font_conf = ImageFont.truetype(path, 20)
@@ -712,6 +599,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     missing = [s for s in STUDENT_ROSTER if s not in known_present]
     attendance_pct = int(len(known_present) / max(len(STUDENT_ROSTER), 1) * 100)
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
     updated_absences = update_absences(missing)
 
     st.session_state.last_results = {
@@ -722,24 +610,24 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
     st.markdown(f"""
     <div class="stat-row">
-      <div class="stat-card">
-        <div class="stat-label"><span class="material-symbols-outlined" style="color:#7a9e6a;">check_circle</span>Present</div>
-        <div class="stat-val stat-green">{len(known_present)}</div>
-        <div class="stat-sub">out of {len(STUDENT_ROSTER)}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label"><span class="material-symbols-outlined" style="color:#c4605a;">cancel</span>Absent</div>
-        <div class="stat-val stat-red">{len(missing)}</div>
-        <div class="stat-sub">check required</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label"><span class="material-symbols-outlined" style="color:#d4a853;">insights</span>Attendance</div>
-        <div class="stat-val stat-gold">{attendance_pct}%</div>
-        <div class="stat-sub">today</div>
-      </div>
+        <div class="stat-card">
+            <div class="stat-label"><span class="material-symbols-outlined" style="color:#7a9e6a;">check_circle</span>Present</div>
+            <div class="stat-val stat-green">{len(known_present)}</div>
+            <div class="stat-sub">out of {len(STUDENT_ROSTER)}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label"><span class="material-symbols-outlined" style="color:#c4605a;">cancel</span>Absent</div>
+            <div class="stat-val stat-red">{len(missing)}</div>
+            <div class="stat-sub">check required</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label"><span class="material-symbols-outlined" style="color:#d4a853;">insights</span>Attendance</div>
+            <div class="stat-val stat-gold">{attendance_pct}%</div>
+            <div class="stat-sub">today</div>
+        </div>
     </div>
     <div class="progress-container">
-      <div class="progress-bar" style="width:{attendance_pct}%"></div>
+        <div class="progress-bar" style="width:{attendance_pct}%"></div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -748,12 +636,12 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         names = ", ".join(chronic_absent)
         st.markdown(f"""
         <div style="background:#c4605a15;border:1.5px solid #c4605a50;border-radius:12px;
-             padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
-          <span class="material-symbols-outlined" style="color:#c4605a;font-size:24px;">notification_important</span>
-          <div>
-            <div style="font-weight:700;color:#a03030;font-size:14px;">Chronic absence alert!</div>
-            <div style="color:#904040;font-size:12px;">{names} have been absent {ABSENCE_THRESHOLD}+ times.</div>
-          </div>
+            padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
+            <span class="material-symbols-outlined" style="color:#c4605a;font-size:24px;">notification_important</span>
+            <div>
+                <div style="font-weight:700;color:#a03030;font-size:14px;">Chronic absence alert!</div>
+                <div style="color:#904040;font-size:12px;">{names} have been absent {ABSENCE_THRESHOLD}+ times.</div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -761,17 +649,16 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     if has_unknown:
         st.markdown("""
         <div style="background:#ff8c0015;border:1.5px solid #ff8c0050;border-radius:12px;
-             padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
-          <span class="material-symbols-outlined" style="color:#ff8c00;font-size:24px;">warning</span>
-          <div>
-            <div style="font-weight:700;color:#c45a00;font-size:14px;">Unidentified person detected!</div>
-            <div style="color:#b07040;font-size:12px;">Someone in the photo is not in the class roster.</div>
-          </div>
+            padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
+            <span class="material-symbols-outlined" style="color:#ff8c00;font-size:24px;">warning</span>
+            <div>
+                <div style="font-weight:700;color:#c45a00;font-size:14px;">Unidentified person detected!</div>
+                <div style="color:#b07040;font-size:12px;">Someone in the photo is not in the class roster.</div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
     st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span>Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
-
     if present_students:
         cols = st.columns(5)
         for i, (name, data) in enumerate(present_students.items()):
@@ -786,7 +673,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                     st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;">{name}</div></div>', unsafe_allow_html=True)
 
     st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span>Absent</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
-
     if missing:
         cols = st.columns(5)
         for i, name in enumerate(missing):
@@ -805,9 +691,9 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 if st.session_state.mode == "upload":
     st.markdown("""
     <div class="upload-zone">
-      <span class="material-symbols-outlined">cloud_upload</span>
-      <div class="upload-text">Drop your class photo here</div>
-      <div class="upload-sub">JPG · PNG · JPEG</div>
+        <span class="material-symbols-outlined">cloud_upload</span>
+        <div class="upload-text">Drop your class photo here</div>
+        <div class="upload-sub">JPG · PNG · JPEG</div>
     </div>
     """, unsafe_allow_html=True)
     class_file = st.file_uploader("", type=["jpg","jpeg","png"], label_visibility="collapsed")
