@@ -256,7 +256,6 @@ if "student_roster" not in st.session_state:
 
 STUDENT_ROSTER = st.session_state.student_roster
 
-# ---- טעינת הרשת הסיאמית ----
 @st.cache_resource
 def load_siamese_model():
     try:
@@ -266,15 +265,13 @@ def load_siamese_model():
 
         IMG_SHAPE = (128, 128, 3)
 
-        # --- בניית embedding זהה למודל האימון ---
         def build_pro_embedding():
             base_model = MobileNetV2(
                 input_shape=IMG_SHAPE,
                 include_top=False,
-                weights='imagenet'   # ❗ חשוב מאוד — זה מה שאימנת עליו
+                weights='imagenet'   # ❗ חשוב מאוד
             )
 
-            # ❗ זהה לאימון — מקפיאים את רוב השכבות
             base_model.trainable = True
             for layer in base_model.layers[:-50]:
                 layer.trainable = False
@@ -294,11 +291,9 @@ def load_siamese_model():
 
         embedding_model = build_pro_embedding()
 
-        # בונים פעם אחת כדי לאפשר טעינת משקולות
         dummy = tf.zeros((1, 128, 128, 3))
         _ = embedding_model(dummy)
 
-        # טעינת משקולות
         embedding_model.load_weights(SIAMESE_WEIGHTS_PATH)
 
         return embedding_model
