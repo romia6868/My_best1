@@ -640,55 +640,77 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         st.markdown('<div class="model-badge model-badge-deepface"><span class="material-symbols-outlined" style="font-size:14px;">hub</span> Using: DeepFace Facenet512</div>', unsafe_allow_html=True)
         active_embeddings = reference_embeddings
         active_threshold = threshold
+present_students = {}
+recognized_faces = []
+total = max(len(faces), 1)
 
-    present_students = {}
-    recognized_faces = []
-    total = max(len(faces), 1)
+for i, data in enumerate(faces):
+    img = data["face"]
+    box = data["box"]
+    progress.progress(30 + int(60 * i / total), text=f"Identifying face {i+1} of {len(faces)}...")
 
-    for i, data in enumerate(faces):
-        img = data["face"]
-        box = data["box"]
-        progress.progress(30 + int(60 * i / total), text=f"Identifying face {i+1} of {len(faces)}...")
+    # --- הפקת embedding ---
+    try:
+        if use_siamese:
+            emb = get_embedding_siamese(img)
+        else:
+            result = DeepFace.represent(
+                img_path=np.array(img),
+                model_name="Facenet512",
+                detector_backend="skip",
+                enforce_detection=False
+            )
+            emb = np.array(result[0]["embedding"])
+            emb = emb / np.linalg.norm(emb)
+    except Exception as e:
+        st.write(f"❌ Failed to extract embedding: {e}")
+        continue
 
-        try:
-            if use_siamese:
-                emb = get_embedding_siamese(img)
-            else:
-                result = DeepFace.represent(
-                    img_path=np.array(img),
-                    model_name="Facenet512",
-                    detector_backend="skip",
-                    enforce_detection=False
-                )
-                emb = np.array(result[0]["embedding"])
-                emb = emb / np.linalg.norm(emb)
-        except:
-            continue
+    # --- אם אין אמבדינגים להשוואה ---
+    if not active_embeddings:
+        st.write("⚠ No reference embeddings loaded!")
+        continue
 
-        if not active_embeddings:
-            continue
+    # --- חישוב מרחקים ---
+    distances = {}
+    for name, ref_embs in active_embeddings.items():
+        if use_siamese:
+            d = min([euclidean_distance(emb, r) for r in ref_embs])
+        else:
+            d = min([cosine_distance(emb, r) for r in ref_embs])
 
-        distances = {}
-        for name, ref_embs in active_embeddings.items():
-            if use_siamese:
-                distances[name] = min([euclidean_distance(emb, r) for r in ref_embs])
-            else:
-                distances[name] = min([cosine_distance(emb, r) for r in ref_embs])
+        distances[name] = d
 
-        best_name, best_dist = min(distances.items(), key=lambda x: x[1])
-        if best_dist > active_threshold:
-            best_name = None
+        # דיבאג: לראות את המרחקים האמיתיים
+        st.write(f"🔍 Comparing to {name}: distance = {d}")
 
-        if best_name and best_name not in present_students:
+    # --- בחירת ההתאמה הטובה ביותר ---
+    best_name, best_dist = min(distances.items(), key=lambda x: x[1])
+
+    st.write(f"➡ Best match: {best_name} (dist={best_dist}, threshold={active_threshold})")
+
+    # --- החלטה אם זה ידוע או לא ---
+    if best_dist <= active_threshold:
+        # זיהוי מוצלח
+        if best_name not in present_students:
             present_students[best_name] = {"img": img, "unknown": False}
-            recognized_faces.append({"name": best_name, "box": box, "dist": best_dist, "unknown": False})
-        elif best_name is None:
-            unknown_key = f"Unknown_{i}"
-            present_students[unknown_key] = {"img": img, "unknown": True}
-            recognized_faces.append({"name": "Unknown", "box": box, "dist": 1.0, "unknown": True})
+            recognized_faces.append({
+                "name": best_name,
+                "box": box,
+                "dist": best_dist,
+                "unknown": False
+            })
+    else:
+        # לא ידוע
+        unknown_key = f"Unknown_{i}"
+        present_students[unknown_key] = {"img": img, "unknown": True}
+        recognized_faces.append({
+            "name": "Unknown",
+            "box": box,
+            "dist": best_dist,
+            "unknown": True
+        })
 
-    progress.progress(100, text="Done!")
-    progress.empty()
 
     st.markdown(f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;">{len(faces)} faces detected</p>', unsafe_allow_html=True)
 
