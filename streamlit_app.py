@@ -8,6 +8,7 @@ except Exception as e:
     print("cv2 FULL ERROR:", repr(e))
     import traceback
     traceback.print_exc()
+
 import streamlit as st
 from deepface import DeepFace
 from PIL import Image, ImageOps, ImageDraw, ImageFont
@@ -36,8 +37,13 @@ if "last_results" not in st.session_state:
     st.session_state.last_results = None
 if "absence_counter" not in st.session_state:
     st.session_state.absence_counter = {}
+if "model_choice" not in st.session_state:
+    st.session_state.model_choice = "DeepFace Facenet512"
 
 ABSENCE_THRESHOLD = 3
+SIAMESE_WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "my_siamese3_weights.weights.h5")
+SIAMESE_THRESHOLD = 0.49  # Best Threshold (95% Recall)
+
 css = """
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"/>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"/>
@@ -68,9 +74,7 @@ css = """
     0% { top: 0%; opacity: 1; }
     100% { top: 100%; opacity: 0.3; }
 }
-.stApp {
-    background: #f0eef4 !important;
-}
+.stApp { background: #f0eef4 !important; }
 .main-header {
     display: flex; align-items: center; gap: 14px;
     padding: 1.5rem 0 1rem;
@@ -163,62 +167,47 @@ css = """
 .sidebar-student:hover { border-color: #b8a9c9; transform: translateX(4px); box-shadow: 2px 0 8px #b8a9c920; }
 .sidebar-student .material-symbols-outlined { font-size: 16px; color: #9585b0; }
 .mode-desc { color: #a098b8; font-size: 14px; margin-bottom: 1rem; }
-.stSlider > div > div > div > div { background: #9585b0 !important; }
-.stSlider > div > div > div { background: #e4dff0 !important; }
-[data-testid="stSlider"] label { color: #4a3a6a !important; }
-[data-testid="stThumbValue"] { color: gray !important; }
+.model-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    margin-bottom: 1rem;
+}
+.model-badge-deepface { background: #9585b020; color: #9585b0; border: 1px solid #9585b040; }
+.model-badge-siamese { background: #68b88a20; color: #68b88a; border: 1px solid #68b88a40; }
 </style>
 """
 
 button_css = """
 <style>
 .stButton > button {
-    background: #ebe8f2 !important;
-    color: #4a3a6a !important;
-    border: 1.5px solid #e4dff0 !important;
-    border-radius: 10px !important;
-    padding: 11px 16px !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    width: 100% !important;
+    background: #ebe8f2 !important; color: #4a3a6a !important;
+    border: 1.5px solid #e4dff0 !important; border-radius: 10px !important;
+    padding: 11px 16px !important; font-size: 14px !important;
+    font-weight: 500 !important; width: 100% !important;
     transition: all 0.2s !important;
-    font-family: 'Space Grotesk', sans-serif !important;
-    margin-top: 0 !important;
+    font-family: 'Space Grotesk', sans-serif !important; margin-top: 0 !important;
 }
 .stButton > button:hover {
-    border-color: #9585b0 !important;
-    transform: translateY(-2px) !important;
+    border-color: #9585b0 !important; transform: translateY(-2px) !important;
     box-shadow: 0 4px 12px #b8a9c930 !important;
 }
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, #b8a9c9, #9585b0) !important;
-    color: white !important;
-    border: none !important;
+    color: white !important; border: none !important;
     box-shadow: 0 4px 14px #b8a9c940 !important;
-    padding: 13px 28px !important;
-    font-size: 15px !important;
-    font-weight: 600 !important;
-    margin-top: 12px !important;
+    padding: 13px 28px !important; font-size: 15px !important;
+    font-weight: 600 !important; margin-top: 12px !important;
 }
 .stButton > button[kind="primary"]:hover {
-    filter: brightness(1.08) !important;
-    transform: translateY(-2px) !important;
+    filter: brightness(1.08) !important; transform: translateY(-2px) !important;
 }
 .stDownloadButton > button {
-    background: #ebe8f2 !important;
-    color: #9585b0 !important;
-    border: 1.5px solid #b8a9c9 !important;
-    border-radius: 10px !important;
-    font-size: 13px !important;
-    font-weight: 600 !important;
-    width: 100% !important;
-    transition: all 0.2s !important;
-    margin-top: 8px !important;
+    background: #ebe8f2 !important; color: #9585b0 !important;
+    border: 1.5px solid #b8a9c9 !important; border-radius: 10px !important;
+    font-size: 13px !important; font-weight: 600 !important;
+    width: 100% !important; transition: all 0.2s !important; margin-top: 8px !important;
 }
-.stDownloadButton > button:hover {
-    background: #e4dff0 !important;
-    transform: translateY(-1px) !important;
-}
+.stDownloadButton > button:hover { background: #e4dff0 !important; transform: translateY(-1px) !important; }
 </style>
 """
 
@@ -267,6 +256,38 @@ if "student_roster" not in st.session_state:
 
 STUDENT_ROSTER = st.session_state.student_roster
 
+# ---- טעינת הרשת הסיאמית ----
+@st.cache_resource
+def load_siamese_model():
+    try:
+        import tensorflow as tf
+        from tensorflow.keras.applications import MobileNetV2
+        from tensorflow.keras import layers, models
+
+        def build_embedding_model():
+            base_model = MobileNetV2(input_shape=(128, 128, 3), include_top=False, weights=None)
+            base_model.trainable = True
+            model = models.Sequential([
+                base_model,
+                layers.GlobalAveragePooling2D(),
+                layers.Dense(512, activation='relu'),
+                layers.BatchNormalization(),
+                layers.Dropout(0.3),
+                layers.Dense(256, activation='relu'),
+                layers.Dense(128, activation=None),
+                layers.Lambda(lambda x: tf.math.l2_normalize(x, axis=1), name="l2_norm")
+            ], name="MobileNetV2_Siamese_Pro")
+            return model
+
+        model = build_embedding_model()
+        # בניית המודל עם input לפני טעינת משקולות
+        model.build((None, 128, 128, 3))
+        model.load_weights(SIAMESE_WEIGHTS_PATH)
+        return model
+    except Exception as e:
+        st.warning(f"Could not load Siamese model: {e}")
+        return None
+
 @st.cache_resource
 def load_reference_embeddings():
     embeddings = {}
@@ -294,6 +315,31 @@ def load_reference_embeddings():
     return embeddings
 
 @st.cache_resource
+def load_siamese_embeddings(_siamese_model):
+    """בונה embeddings של כל התלמידים עם הרשת הסיאמית"""
+    if _siamese_model is None:
+        return {}
+    embeddings = {}
+    for student in os.listdir(REFERENCE_DIR):
+        student_path = os.path.join(REFERENCE_DIR, student)
+        if os.path.isdir(student_path):
+            student_embeddings = []
+            for file in os.listdir(student_path):
+                if file.lower().endswith((".jpg",".jpeg",".png",".jfif")):
+                    img_path = os.path.join(student_path, file)
+                    try:
+                        img = Image.open(img_path).convert("RGB").resize((128, 128))
+                        img_arr = np.array(img, dtype=np.float32) / 255.0
+                        img_arr = np.expand_dims(img_arr, axis=0)
+                        emb = _siamese_model.predict(img_arr, verbose=0)[0]
+                        student_embeddings.append(emb)
+                    except:
+                        pass
+            if student_embeddings:
+                embeddings[student] = student_embeddings
+    return embeddings
+
+@st.cache_resource
 def load_reference_photos():
     photos = {}
     for student in STUDENT_ROSTER:
@@ -306,7 +352,9 @@ def load_reference_photos():
                 photos[student] = Image.open(img_path).convert("RGB")
     return photos
 
+siamese_model = load_siamese_model()
 reference_embeddings = load_reference_embeddings()
+siamese_embeddings = load_siamese_embeddings(siamese_model)
 reference_photos = load_reference_photos()
 
 st.markdown("""
@@ -344,6 +392,34 @@ with st.sidebar:
         )
     else:
         st.markdown('<p style="color:#c0a898;font-size:12px;margin-top:8px;">Run a scan to enable export</p>', unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # ---- בחירת מודל ----
+    st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">model_training</span> Recognition Model</div>', unsafe_allow_html=True)
+
+    siamese_available = siamese_model is not None and len(siamese_embeddings) > 0
+    model_options = ["DeepFace Facenet512"]
+    if siamese_available:
+        model_options.append("My Siamese Network")
+
+    chosen_model = st.radio(
+        "Choose model",
+        model_options,
+        key="model_choice_radio",
+        help="Siamese = custom-trained on your classmates. Facenet512 = pretrained general model."
+    )
+    st.session_state.model_choice = chosen_model
+
+    if chosen_model == "My Siamese Network":
+        st.markdown('<div class="model-badge model-badge-siamese"><span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> Custom model loaded</div>', unsafe_allow_html=True)
+        st.markdown(f'<p style="color:#a098b8;font-size:11px;">Threshold: {SIAMESE_THRESHOLD} · Euclidean distance · 100% recall</p>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="model-badge model-badge-deepface"><span class="material-symbols-outlined" style="font-size:14px;">hub</span> Facenet512 active</div>', unsafe_allow_html=True)
+        st.markdown('<p style="color:#a098b8;font-size:11px;">Pretrained · Cosine distance · 512-dim</p>', unsafe_allow_html=True)
+
+    if not siamese_available:
+        st.markdown('<p style="color:#d4707a;font-size:11px;">⚠ Siamese weights not found</p>', unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">manage_accounts</span> Manage Students</div>', unsafe_allow_html=True)
@@ -405,18 +481,32 @@ with st.sidebar:
                     save_roster(st.session_state.student_roster)
                 st.session_state.collected_photos = []
                 with st.spinner(f"Processing {new_name}'s photos..."):
-                    new_embeddings = []
+                    new_embs_deepface = []
+                    new_embs_siamese = []
                     for idx in range(len(photos_collected)):
                         img_path = os.path.join(student_dir, f"{new_name}_{idx+1}.jpg")
+                        # Facenet
                         try:
                             result = DeepFace.represent(img_path=img_path, model_name="Facenet512", detector_backend="retinaface", enforce_detection=False)
                             emb = np.array(result[0]["embedding"])
                             emb = emb / np.linalg.norm(emb)
-                            new_embeddings.append(emb)
+                            new_embs_deepface.append(emb)
                         except:
                             pass
-                    if new_embeddings:
-                        reference_embeddings[new_name] = new_embeddings
+                        # Siamese
+                        if siamese_model is not None:
+                            try:
+                                img = Image.open(img_path).convert("RGB").resize((128, 128))
+                                img_arr = np.array(img, dtype=np.float32) / 255.0
+                                img_arr = np.expand_dims(img_arr, axis=0)
+                                emb = siamese_model.predict(img_arr, verbose=0)[0]
+                                new_embs_siamese.append(emb)
+                            except:
+                                pass
+                    if new_embs_deepface:
+                        reference_embeddings[new_name] = new_embs_deepface
+                    if new_embs_siamese:
+                        siamese_embeddings[new_name] = new_embs_siamese
                 st.success(f"✓ {new_name} added!")
                 st.rerun()
 
@@ -511,7 +601,20 @@ def extract_faces(image, confidence_threshold=0.7):
 def cosine_distance(a, b):
     return 1 - np.dot(a, b)
 
+def euclidean_distance(a, b):
+    return float(np.linalg.norm(a - b))
+
+def get_embedding_siamese(face_img):
+    """מחלץ embedding עם הרשת הסיאמית"""
+    img = face_img.convert("RGB").resize((128, 128))
+    img_arr = np.array(img, dtype=np.float32) / 255.0
+    img_arr = np.expand_dims(img_arr, axis=0)
+    emb = siamese_model.predict(img_arr, verbose=0)[0]
+    return emb
+
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
+    use_siamese = st.session_state.model_choice == "My Siamese Network" and siamese_model is not None
+
     scan_placeholder = st.empty()
     scan_placeholder.markdown("""
     <div class="scan-container">
@@ -528,6 +631,16 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     progress.progress(30, text="Analyzing faces...")
     scan_placeholder.empty()
 
+    # הצגת המודל הפעיל
+    if use_siamese:
+        st.markdown('<div class="model-badge model-badge-siamese"><span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> Using: My Siamese Network</div>', unsafe_allow_html=True)
+        active_embeddings = siamese_embeddings
+        active_threshold = SIAMESE_THRESHOLD
+    else:
+        st.markdown('<div class="model-badge model-badge-deepface"><span class="material-symbols-outlined" style="font-size:14px;">hub</span> Using: DeepFace Facenet512</div>', unsafe_allow_html=True)
+        active_embeddings = reference_embeddings
+        active_threshold = threshold
+
     present_students = {}
     recognized_faces = []
     total = max(len(faces), 1)
@@ -536,24 +649,34 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         img = data["face"]
         box = data["box"]
         progress.progress(30 + int(60 * i / total), text=f"Identifying face {i+1} of {len(faces)}...")
+
         try:
-            result = DeepFace.represent(
-                img_path=np.array(img),
-                model_name="Facenet512",
-                detector_backend="skip",
-                enforce_detection=False
-            )
-            emb = np.array(result[0]["embedding"])
-            emb = emb / np.linalg.norm(emb)
+            if use_siamese:
+                emb = get_embedding_siamese(img)
+            else:
+                result = DeepFace.represent(
+                    img_path=np.array(img),
+                    model_name="Facenet512",
+                    detector_backend="skip",
+                    enforce_detection=False
+                )
+                emb = np.array(result[0]["embedding"])
+                emb = emb / np.linalg.norm(emb)
         except:
             continue
 
-        avg_distances = {}
-        for name, ref_embs in reference_embeddings.items():
-            avg_distances[name] = min([cosine_distance(emb, r) for r in ref_embs])
+        if not active_embeddings:
+            continue
 
-        best_name, best_dist = min(avg_distances.items(), key=lambda x: x[1])
-        if best_dist > threshold:
+        distances = {}
+        for name, ref_embs in active_embeddings.items():
+            if use_siamese:
+                distances[name] = min([euclidean_distance(emb, r) for r in ref_embs])
+            else:
+                distances[name] = min([cosine_distance(emb, r) for r in ref_embs])
+
+        best_name, best_dist = min(distances.items(), key=lambda x: x[1])
+        if best_dist > active_threshold:
             best_name = None
 
         if best_name and best_name not in present_students:
@@ -588,7 +711,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             draw.rectangle([x, y, x+w, y+h], outline=(220,100,30), width=3)
             draw.text((x, y-42), "Unknown", fill=(220,100,30), font=font_name)
         else:
-            pct = int((1 - face["dist"]) * 100)
+            pct = int((1 - face["dist"]) * 100) if not use_siamese else int(max(0, (1 - face["dist"] / active_threshold)) * 100)
             draw.rectangle([x, y, x+w, y+h], outline=(201,149,102), width=3)
             draw.text((x, y-42), face["name"], fill=(181,120,74), font=font_name)
             draw.text((x, y-20), f"{pct}%", fill=(212,168,83), font=font_conf)
@@ -601,7 +724,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     updated_absences = update_absences(missing)
-
     st.session_state.last_results = {
         "present": list(known_present.keys()),
         "missing": missing,
