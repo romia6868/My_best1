@@ -261,12 +261,24 @@ STUDENT_ROSTER = st.session_state.student_roster
 def load_siamese_model():
     try:
         import tensorflow as tf
-        from tensorflow.keras.applications import MobileNetV2
         from tensorflow.keras import layers, models
+        from tensorflow.keras.applications import MobileNetV2
 
-        def build_embedding_model():
-            base_model = MobileNetV2(input_shape=(128, 128, 3), include_top=False, weights=None)
+        IMG_SHAPE = (128, 128, 3)
+
+        # --- בניית embedding זהה למודל האימון ---
+        def build_pro_embedding():
+            base_model = MobileNetV2(
+                input_shape=IMG_SHAPE,
+                include_top=False,
+                weights='imagenet'   # ❗ חשוב מאוד — זה מה שאימנת עליו
+            )
+
+            # ❗ זהה לאימון — מקפיאים את רוב השכבות
             base_model.trainable = True
+            for layer in base_model.layers[:-50]:
+                layer.trainable = False
+
             model = models.Sequential([
                 base_model,
                 layers.GlobalAveragePooling2D(),
@@ -276,17 +288,25 @@ def load_siamese_model():
                 layers.Dense(256, activation='relu'),
                 layers.Dense(128, activation=None),
                 layers.Lambda(lambda x: tf.math.l2_normalize(x, axis=1), name="l2_norm")
-            ], name="MobileNetV2_Siamese_Pro")
+            ], name="MobileNetV2_Embedding")
+
             return model
 
-        model = build_embedding_model()
-        # בניית המודל עם input לפני טעינת משקולות
-        model.build((None, 128, 128, 3))
-        model.load_weights(SIAMESE_WEIGHTS_PATH)
-        return model
+        embedding_model = build_pro_embedding()
+
+        # בונים פעם אחת כדי לאפשר טעינת משקולות
+        dummy = tf.zeros((1, 128, 128, 3))
+        _ = embedding_model(dummy)
+
+        # טעינת משקולות
+        embedding_model.load_weights(SIAMESE_WEIGHTS_PATH)
+
+        return embedding_model
+
     except Exception as e:
-        st.warning(f"Could not load Siamese model: {e}")
+        st.error(f"Could not load Siamese model: {e}")
         return None
+
 
 @st.cache_resource
 def load_reference_embeddings():
