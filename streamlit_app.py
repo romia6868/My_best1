@@ -333,27 +333,39 @@ def load_reference_embeddings():
 @st.cache_resource
 def load_siamese_embeddings(_siamese_model):
     """בונה embeddings של כל התלמידים עם הרשת הסיאמית"""
+    from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+
     if _siamese_model is None:
         return {}
+
     embeddings = {}
+
     for student in os.listdir(REFERENCE_DIR):
         student_path = os.path.join(REFERENCE_DIR, student)
         if os.path.isdir(student_path):
             student_embeddings = []
+
             for file in os.listdir(student_path):
                 if file.lower().endswith((".jpg",".jpeg",".png",".jfif")):
                     img_path = os.path.join(student_path, file)
+
                     try:
                         img = Image.open(img_path).convert("RGB").resize((128, 128))
-                        img_arr = np.array(img, dtype=np.float32) / 255.0
+                        img_arr = np.array(img, dtype=np.float32)
+                        img_arr = preprocess_input(img_arr)   # ❗ חובה
                         img_arr = np.expand_dims(img_arr, axis=0)
+
                         emb = _siamese_model.predict(img_arr, verbose=0)[0]
                         student_embeddings.append(emb)
-                    except:
-                        pass
+
+                    except Exception as e:
+                        print("Error embedding:", e)
+
             if student_embeddings:
                 embeddings[student] = student_embeddings
+
     return embeddings
+
 
 @st.cache_resource
 def load_reference_photos():
