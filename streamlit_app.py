@@ -553,6 +553,35 @@ for idx, (mode_key, label) in enumerate(tab_data):
             st.session_state.mode = mode_key
             st.rerun()
 
+def paste_face_safely(bg_pil, face_img, cell_x, cell_y, cell_w, cell_h):
+    """
+    מדביקה פנים על רקע בצורה נקייה:
+    - מסירה רקע
+    - שומרת על יחס גובה-רוחב
+    - מתאימה לגודל התא בלי עיוות
+    - ממקמת במרכז התא
+    """
+
+    # 1. הסרת רקע
+    face_no_bg = remove(face_img)
+
+    # 2. שמירה על יחס גובה–רוחב
+    orig_w, orig_h = face_no_bg.size
+    ratio = min(cell_w / orig_w, cell_h / orig_h)
+    new_w = int(orig_w * ratio)
+    new_h = int(orig_h * ratio)
+
+    face_resized = face_no_bg.resize((new_w, new_h), Image.LANCZOS)
+
+    # 3. מיקום במרכז התא
+    paste_x = cell_x + (cell_w - new_w) // 2
+    paste_y = cell_y + (cell_h - new_h) // 2
+
+    # 4. הדבקה
+    bg_pil.paste(face_resized, (paste_x, paste_y), face_resized)
+
+    return bg_pil
+
 def generate_class_image():
     background_options = [
         os.path.join(BASE_DIR, "הורדה.jfif"),
@@ -560,41 +589,57 @@ def generate_class_image():
         os.path.join(BASE_DIR, "images.jfif"),
         os.path.join(BASE_DIR, "images (2).jfif"),
     ]
+
     available_backgrounds = [b for b in background_options if os.path.exists(b)]
     if not available_backgrounds:
         st.error("No background images found")
         st.stop()
+
     bg = cv2.imread(random.choice(available_backgrounds))
     if bg is None:
         st.error("Could not load background")
         st.stop()
+
+    # גודל תמונה כיתתית
     bg = cv2.resize(bg, (900, 600), interpolation=cv2.INTER_CUBIC)
+
+    # רשימת תלמידים
     students = os.listdir(REFERENCE_DIR)
     present = random.sample(students, random.randint(0, len(students)))
+
+    # חלוקה ל־2 שורות × 5 עמודות
     rows, cols = 2, 5
     cell_w = bg.shape[1] // cols
     cell_h = bg.shape[0] // rows
+
+    # מיקומים אפשריים
     positions = [(c * cell_w, r * cell_h) for r in range(rows) for c in range(cols)]
     random.shuffle(positions)
+
+    # המרה ל־PIL
     bg_pil = Image.fromarray(cv2.cvtColor(bg, cv2.COLOR_BGR2RGB)).convert("RGBA")
+
     i = 0
     for name in present:
         if i < len(positions):
             student_dir = os.path.join(REFERENCE_DIR, name)
             imgs = os.listdir(student_dir)
+
             if imgs:
                 face = cv2.imread(os.path.join(student_dir, random.choice(imgs)))
                 if face is not None:
-                    new_w = int(cell_w * 0.8)
-                    new_h = int(cell_h * 0.8)
                     face_pil = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
-                    face_no_bg = remove(face_pil).resize((new_w, new_h))
+
+                    # מיקום בתא
                     x, y = positions[i]
-                    x += (cell_w - new_w) // 2
-                    y += (cell_h - new_h) // 2
-                    bg_pil.paste(face_no_bg, (x, y), face_no_bg)
+
+                    # הדבקה בטוחה ללא עיוות
+                    bg_pil = paste_face_safely(bg_pil, face_pil, x, y, cell_w, cell_h)
+
                     i += 1
+
     return np.array(bg_pil.convert("RGB")), present
+
 
 def extract_faces(image, confidence_threshold=0.7):
     img_rgb = np.array(image.convert("RGB"))
