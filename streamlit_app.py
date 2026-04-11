@@ -715,7 +715,7 @@ def extract_faces(image, confidence_threshold=0.7):
                 continue
             face_img = Image.fromarray(face).resize((160, 160))
             faces.append({"face": face_img, "box": (x1, y1, x2-x1, y2-y1)})
-    except Exception as e:כ
+    except Exception as e:
         st.warning(f"Face detection error: {e}")
     return faces, img_rgb
 
