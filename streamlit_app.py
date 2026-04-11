@@ -581,43 +581,47 @@ def paste_face_safely(bg_pil, face_img, cell_x, cell_y, cell_w, cell_h):
     bg_pil.paste(face_resized, (paste_x, paste_y), face_resized)
 
     return bg_pil
-def fix_image_rotation(img_pil):
+def rotate_face_by_eyes(img_pil):
     """
-    מתקנת תמונות מסובבות לפי זיהוי פנים בפועל.
-    מסובבת עד שהפנים מופיעות בצורה אנכית.
+    מסובבת תמונה כך שהעיניים יהיו בקו אופקי.
+    הכי יציב, הכי מדויק, בלי עיוותים.
     """
 
     import numpy as np
     from deepface import DeepFace
+    import math
 
-    # ננסה עד 4 כיוונים (0°, 90°, 180°, 270°)
-    for _ in range(4):
-        img_np = np.array(img_pil)
+    img_np = np.array(img_pil)
 
-        try:
-            faces = DeepFace.extract_faces(
-                img_path=img_np,
-                detector_backend="retinaface",
-                enforce_detection=False
-            )
+    try:
+        faces = DeepFace.extract_faces(
+            img_path=img_np,
+            detector_backend="retinaface",
+            enforce_detection=False
+        )
 
-            if len(faces) > 0:
-                # ניקח את הפנים הראשונות
-                face = faces[0]
-                box = face["facial_area"]
-                w, h = box["w"], box["h"]
+        if len(faces) == 0:
+            return img_pil
 
-                # אם הגובה גדול מהרוחב → הפנים ישרות
-                if h >= w:
-                    return img_pil
-        except:
-            pass
+        face = faces[0]
+        landmarks = face.get("landmarks", {})
 
-        # אם לא ישר → נסובב 90° וננסה שוב
-        img_pil = img_pil.rotate(90, expand=True)
+        if "left_eye" not in landmarks or "right_eye" not in landmarks:
+            return img_pil
 
-    # אם לא הצלחנו לזהות → נחזיר כמו שהוא
-    return img_pil
+        left = landmarks["left_eye"]
+        right = landmarks["right_eye"]
+
+        dx = right[0] - left[0]
+        dy = right[1] - left[1]
+
+        angle = math.degrees(math.atan2(dy, dx))
+
+        # סיבוב הפוך כדי ליישר
+        return img_pil.rotate(-angle, expand=True)
+
+    except:
+        return img_pil
 
 
 def generate_class_image():
@@ -671,8 +675,8 @@ def generate_class_image():
                     # המרת התמונה ל-PIL
                     face_pil = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
 
-                    # ⭐ תיקון תמונות מסובבות (החלק הקריטי)
-                    face_pil = fix_image_rotation(face_pil)
+                    # ⭐ יישור פנים לפי העיניים (הכי מדויק)
+                    face_pil = rotate_face_by_eyes(face_pil)
 
                     # מיקום בתא
                     x, y = positions[i]
