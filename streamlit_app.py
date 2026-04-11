@@ -582,6 +582,37 @@ def paste_face_safely(bg_pil, face_img, cell_x, cell_y, cell_w, cell_h):
 
     return bg_pil
 
+def fix_image_rotation(img_pil):
+    """
+    מתקנת תמונות מסובבות לפי EXIF או לפי יחס גובה-רוחב.
+    מחזירה תמונה ישרה.
+    """
+
+    # 1. ניסיון לתקן לפי EXIF (הכי מדויק)
+    try:
+        exif = img_pil._getexif()
+        if exif is not None:
+            orientation_key = 274  # Orientation EXIF tag
+            if orientation_key in exif:
+                orientation = exif[orientation_key]
+
+                if orientation == 3:
+                    img_pil = img_pil.rotate(180, expand=True)
+                elif orientation == 6:
+                    img_pil = img_pil.rotate(270, expand=True)
+                elif orientation == 8:
+                    img_pil = img_pil.rotate(90, expand=True)
+    except:
+        pass
+
+    # 2. אם עדיין רחב יותר מגבוה → כנראה מאוזן
+    w, h = img_pil.size
+    if w > h:
+        img_pil = img_pil.rotate(90, expand=True)
+
+    return img_pil
+
+
 def generate_class_image():
     background_options = [
         os.path.join(BASE_DIR, "הורדה.jfif"),
@@ -590,6 +621,7 @@ def generate_class_image():
         os.path.join(BASE_DIR, "images (2).jfif"),
     ]
 
+    # בחירת רקע תקין
     available_backgrounds = [b for b in background_options if os.path.exists(b)]
     if not available_backgrounds:
         st.error("No background images found")
@@ -628,12 +660,17 @@ def generate_class_image():
             if imgs:
                 face = cv2.imread(os.path.join(student_dir, random.choice(imgs)))
                 if face is not None:
+
+                    # המרת התמונה ל-PIL
                     face_pil = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
+
+                    # ⭐ תיקון תמונות מסובבות
+                    face_pil = fix_image_rotation(face_pil)
 
                     # מיקום בתא
                     x, y = positions[i]
 
-                    # הדבקה בטוחה ללא עיוות
+                    # ⭐ הדבקה בטוחה ללא עיוות
                     bg_pil = paste_face_safely(bg_pil, face_pil, x, y, cell_w, cell_h)
 
                     i += 1
