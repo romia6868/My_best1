@@ -715,7 +715,7 @@ def extract_faces(image, confidence_threshold=0.7):
                 continue
             face_img = Image.fromarray(face).resize((160, 160))
             faces.append({"face": face_img, "box": (x1, y1, x2-x1, y2-y1)})
-    except Exception as e:
+    except Exception as e:כ
         st.warning(f"Face detection error: {e}")
     return faces, img_rgb
 
@@ -892,10 +892,16 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
     updated_absences = update_absences(missing)
     st.session_state.last_results = {
-        "present": list(known_present.keys()),
+        "present": present,
         "missing": missing,
         "date": date_str
     }
+    
+    # ⭐ סאונד שמח כשכולם נמצאים
+    all_students = os.listdir(REFERENCE_DIR)
+    if len(present) == len(all_students):
+        st.success("🎉 Everyone is here!")
+        st.audio("3.mp3", autoplay=True)
 
     st.markdown(f"""
     <div class="stat-row">
