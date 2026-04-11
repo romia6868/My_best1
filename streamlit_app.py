@@ -581,35 +581,42 @@ def paste_face_safely(bg_pil, face_img, cell_x, cell_y, cell_w, cell_h):
     bg_pil.paste(face_resized, (paste_x, paste_y), face_resized)
 
     return bg_pil
-
 def fix_image_rotation(img_pil):
     """
-    מתקנת תמונות מסובבות לפי EXIF או לפי יחס גובה-רוחב.
-    מחזירה תמונה ישרה.
+    מתקנת תמונות מסובבות לפי זיהוי פנים בפועל.
+    מסובבת עד שהפנים מופיעות בצורה אנכית.
     """
 
-    # 1. ניסיון לתקן לפי EXIF (הכי מדויק)
-    try:
-        exif = img_pil._getexif()
-        if exif is not None:
-            orientation_key = 274  # Orientation EXIF tag
-            if orientation_key in exif:
-                orientation = exif[orientation_key]
+    import numpy as np
+    from deepface import DeepFace
 
-                if orientation == 3:
-                    img_pil = img_pil.rotate(180, expand=True)
-                elif orientation == 6:
-                    img_pil = img_pil.rotate(270, expand=True)
-                elif orientation == 8:
-                    img_pil = img_pil.rotate(90, expand=True)
-    except:
-        pass
+    # ננסה עד 4 כיוונים (0°, 90°, 180°, 270°)
+    for _ in range(4):
+        img_np = np.array(img_pil)
 
-    # 2. אם עדיין רחב יותר מגבוה → כנראה מאוזן
-    w, h = img_pil.size
-    if w > h:
+        try:
+            faces = DeepFace.extract_faces(
+                img_path=img_np,
+                detector_backend="retinaface",
+                enforce_detection=False
+            )
+
+            if len(faces) > 0:
+                # ניקח את הפנים הראשונות
+                face = faces[0]
+                box = face["facial_area"]
+                w, h = box["w"], box["h"]
+
+                # אם הגובה גדול מהרוחב → הפנים ישרות
+                if h >= w:
+                    return img_pil
+        except:
+            pass
+
+        # אם לא ישר → נסובב 90° וננסה שוב
         img_pil = img_pil.rotate(90, expand=True)
 
+    # אם לא הצלחנו לזהות → נחזיר כמו שהוא
     return img_pil
 
 
@@ -664,7 +671,7 @@ def generate_class_image():
                     # המרת התמונה ל-PIL
                     face_pil = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
 
-                    # ⭐ תיקון תמונות מסובבות
+                    # ⭐ תיקון תמונות מסובבות (החלק הקריטי)
                     face_pil = fix_image_rotation(face_pil)
 
                     # מיקום בתא
