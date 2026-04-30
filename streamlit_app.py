@@ -16,16 +16,20 @@ from PIL import Image, ImageOps, ImageDraw, ImageFont
 import numpy as np
 import zipfile
 import random
-from rembg import remove
 import json
 from datetime import datetime
 import pandas as pd
 from io import BytesIO
 
-# --- Lazy Import ל‑DeepFace (כדי למנוע קריסה) ---
+# --- Lazy Import ל‑DeepFace ---
 def lazy_import_deepface():
     from deepface import DeepFace
     return DeepFace
+
+# --- Lazy Import ל‑rembg ---
+def lazy_import_rembg():
+    from rembg import remove
+    return remove
 
 
 st.set_page_config(
