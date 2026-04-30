@@ -1,27 +1,32 @@
 import sys
 import os
+import traceback
 
+# --- בדיקת cv2 בצורה בטוחה ---
 try:
     import cv2
     print("cv2 OK:", cv2.__version__)
 except Exception as e:
     print("cv2 FULL ERROR:", repr(e))
-    import traceback
     traceback.print_exc()
 
+# --- ספריות כלליות ---
 import streamlit as st
-from deepface import DeepFace
 from PIL import Image, ImageOps, ImageDraw, ImageFont
 import numpy as np
-import os
 import zipfile
 import random
-import cv2
 from rembg import remove
 import json
 from datetime import datetime
 import pandas as pd
 from io import BytesIO
+
+# --- Lazy Import ל‑DeepFace (כדי למנוע קריסה) ---
+def lazy_import_deepface():
+    from deepface import DeepFace
+    return DeepFace
+
 
 st.set_page_config(
     page_title="Smart Attendance",
