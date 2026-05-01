@@ -709,7 +709,7 @@ def extract_faces(image_pil, confidence_threshold=0.7):
 
     try:
         detections = DeepFace.extract_faces(
-            img_path=img_rgb,
+            img_path=image_pil,   # ⭐ חשוב! לא numpy
             detector_backend="retinaface",
             enforce_detection=False
         )
@@ -732,6 +732,7 @@ def extract_faces(image_pil, confidence_threshold=0.7):
         print("Face extraction error:", e)
 
     return faces, img_rgb
+
 
 
 
