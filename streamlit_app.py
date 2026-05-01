@@ -699,34 +699,36 @@ def generate_class_image():
 
 
 def extract_faces(image, confidence_threshold=0.7):
+    
     img_rgb = np.array(image.convert("RGB"))
     faces = []
+
     try:
-        face_objs = DeepFace.extract_faces(
+        detections = DeepFace.extract_faces(
             img_path=img_rgb,
             detector_backend="retinaface",
-            enforce_detection=False,
-            align=True
+            enforce_detection=False
         )
-        for face_obj in face_objs:
-            if face_obj["confidence"] < confidence_threshold:
+
+        for det in detections:
+            conf = det.get("confidence", 0)
+            if conf < confidence_threshold:
                 continue
-            region = face_obj["facial_area"]
-            x, y, w, h = region["x"], region["y"], region["w"], region["h"]
-            pad_x = int(0.2 * w)
-            pad_y = int(0.2 * h)
-            x1 = max(0, x - pad_x)
-            y1 = max(0, y - pad_y)
-            x2 = min(img_rgb.shape[1], x + w + pad_x)
-            y2 = min(img_rgb.shape[0], y + h + pad_y)
-            face = img_rgb[y1:y2, x1:x2]
-            if face.size == 0:
-                continue
-            face_img = Image.fromarray(face).resize((160, 160))
-            faces.append({"face": face_img, "box": (x1, y1, x2-x1, y2-y1)})
+
+            face_img = det["face"]
+            box = det.get("facial_area", {})
+
+            faces.append({
+                "face": Image.fromarray(face_img),
+                "box": box,
+                "confidence": conf
+            })
+
     except Exception as e:
-        st.warning(f"Face detection error: {e}")
-    return faces, img_rgb
+        print("Face extraction error:", e)
+
+    return faces
+
 
 def cosine_distance(a, b):
     return 1 - np.dot(a, b)
@@ -751,7 +753,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         and siamese_model is not None
     )
 
-    # --- UI: סריקה ---
     scan_placeholder = st.empty()
     scan_placeholder.markdown("""
     <div class="scan-container">
@@ -768,7 +769,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     progress.progress(30, text="Analyzing faces...")
     scan_placeholder.empty()
 
-    # --- בחירת מודל ---
     if use_siamese:
         st.markdown(
             '<div class="model-badge model-badge-siamese"><span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> Using: My Siamese Network</div>',
@@ -784,7 +784,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         active_embeddings = reference_embeddings
         active_threshold = threshold
 
-    # --- לולאת השוואה חדשה ---
     present_students = {}
     recognized_faces = []
     total = max(len(faces), 1)
@@ -792,12 +791,12 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     for i, data in enumerate(faces):
         img = data["face"]
         box = data["box"]
+
         progress.progress(
             30 + int(60 * i / total),
             text=f"Identifying face {i+1} of {len(faces)}...",
         )
 
-        # --- הפקת embedding ---
         try:
             if use_siamese:
                 emb = get_embedding_siamese(img)
@@ -814,12 +813,10 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             st.write(f"❌ Failed to extract embedding: {e}")
             continue
 
-        # --- אם אין אמבדינגים להשוואה ---
         if not active_embeddings:
             st.write("⚠ No reference embeddings loaded!")
             continue
 
-        # --- חישוב מרחקים ---
         distances = {}
         for name, ref_embs in active_embeddings.items():
             if use_siamese:
@@ -828,69 +825,60 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                 d = min(cosine_distance(emb, r) for r in ref_embs)
 
             distances[name] = d
-            st.write(f"🔍 Comparing to {name}: distance = {d}")
 
-        # --- בחירת ההתאמה הטובה ביותר ---
         best_name, best_dist = min(distances.items(), key=lambda x: x[1])
-        st.write(f"➡ Best match: {best_name} (dist={best_dist}, threshold={active_threshold})")
 
-        # --- החלטה אם זה ידוע או לא ---
         if best_dist <= active_threshold:
             if best_name not in present_students:
                 present_students[best_name] = {"img": img, "unknown": False}
                 recognized_faces.append(
-                    {
-                        "name": best_name,
-                        "box": box,
-                        "dist": best_dist,
-                        "unknown": False,
-                    }
+                    {"name": best_name, "box": box, "dist": best_dist, "unknown": False}
                 )
         else:
             unknown_key = f"Unknown_{i}"
             present_students[unknown_key] = {"img": img, "unknown": True}
             recognized_faces.append(
-                {
-                    "name": "Unknown",
-                    "box": box,
-                    "dist": best_dist,
-                    "unknown": True,
-                }
+                {"name": "Unknown", "box": box, "dist": best_dist, "unknown": True}
             )
 
-    # --- המשך הפונקציה (ציור, סטטיסטיקות וכו') ---
     progress.progress(100, text="Done!")
     progress.empty()
 
-    # כל שאר הקוד שלך נשאר בדיוק אותו דבר
-    # (ציור תיבות, חישוב נוכחות, UI וכו')
-
-
-    st.markdown(f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;">{len(faces)} faces detected</p>', unsafe_allow_html=True)
+    st.markdown(
+        f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;">{len(faces)} faces detected</p>',
+        unsafe_allow_html=True,
+    )
 
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
+
     font_name = font_conf = None
-    for path in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-                 "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]:
+    for path in [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    ]:
         if os.path.exists(path):
             font_name = ImageFont.truetype(path, 32)
             font_conf = ImageFont.truetype(path, 20)
             break
     if not font_name:
-        font_name = ImageFont.load_default(size=32)
-        font_conf = ImageFont.load_default(size=20)
+        font_name = ImageFont.load_default()
+        font_conf = ImageFont.load_default()
 
     for face in recognized_faces:
         x, y, w, h = face["box"]
         if face["unknown"]:
-            draw.rectangle([x, y, x+w, y+h], outline=(220,100,30), width=3)
-            draw.text((x, y-42), "Unknown", fill=(220,100,30), font=font_name)
+            draw.rectangle([x, y, x + w, y + h], outline=(220, 100, 30), width=3)
+            draw.text((x, y - 42), "Unknown", fill=(220, 100, 30), font=font_name)
         else:
-            pct = int((1 - face["dist"]) * 100) if not use_siamese else int(max(0, (1 - face["dist"] / active_threshold)) * 100)
-            draw.rectangle([x, y, x+w, y+h], outline=(201,149,102), width=3)
-            draw.text((x, y-42), face["name"], fill=(181,120,74), font=font_name)
-            draw.text((x, y-20), f"{pct}%", fill=(212,168,83), font=font_conf)
+            pct = (
+                int((1 - face["dist"]) * 100)
+                if not use_siamese
+                else int(max(0, (1 - face["dist"] / active_threshold)) * 100)
+            )
+            draw.rectangle([x, y, x + w, y + h], outline=(201, 149, 102), width=3)
+            draw.text((x, y - 42), face["name"], fill=(181, 120, 74), font=font_name)
+            draw.text((x, y - 20), f"{pct}%", fill=(212, 168, 83), font=font_conf)
 
     st.image(img_draw, use_column_width=True)
 
@@ -900,15 +888,15 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     updated_absences = update_absences(missing)
+
     st.session_state.last_results = {
-        "present": present,
+        "present": list(known_present.keys()),
         "missing": missing,
-        "date": date_str
+        "date": date_str,
     }
-    
-    # ⭐ סאונד שמח כשכולם נמצאים
+
     all_students = os.listdir(REFERENCE_DIR)
-    if len(present) == len(all_students):
+    if len(known_present) == len(all_students):
         st.success("🎉 Everyone is here!")
         st.audio("3.mp3", autoplay=True)
 
@@ -935,7 +923,9 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     </div>
     """, unsafe_allow_html=True)
 
-    chronic_absent = [s for s in missing if updated_absences.get(s, 0) >= ABSENCE_THRESHOLD]
+    chronic_absent = [
+        s for s in missing if updated_absences.get(s, 0) >= ABSENCE_THRESHOLD
+    ]
     if chronic_absent:
         names = ", ".join(chronic_absent)
         st.markdown(f"""
@@ -949,8 +939,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         </div>
         """, unsafe_allow_html=True)
 
-    has_unknown = any(v["unknown"] for v in present_students.values())
-    if has_unknown:
+    if any(v["unknown"] for v in present_students.values()):
         st.markdown("""
         <div style="background:#ff8c0015;border:1.5px solid #ff8c0050;border-radius:12px;
             padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
@@ -963,20 +952,20 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         """, unsafe_allow_html=True)
 
     st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span>Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
+
     if present_students:
         cols = st.columns(5)
         for i, (name, data) in enumerate(present_students.items()):
             with cols[i % 5]:
+                st.markdown('<div class="student-card">', unsafe_allow_html=True)
+                st.image(data["img"], width=100)
                 if data["unknown"]:
-                    st.markdown('<div class="student-card">', unsafe_allow_html=True)
-                    st.image(data["img"], width=100)
                     st.markdown('<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div><div style="text-align:center;color:#b07040;font-size:11px;">Not in roster</div></div>', unsafe_allow_html=True)
                 else:
-                    st.markdown('<div class="student-card">', unsafe_allow_html=True)
-                    st.image(data["img"], width=100)
                     st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;">{name}</div></div>', unsafe_allow_html=True)
 
     st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span>Absent</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
+
     if missing:
         cols = st.columns(5)
         for i, name in enumerate(missing):
@@ -986,10 +975,18 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                     st.image(reference_photos[name], width=100)
                 absence_count = updated_absences.get(name, 0)
                 color = "#a03030" if absence_count >= ABSENCE_THRESHOLD else "#c4605a"
-                badge = f'<span style="font-size:10px;background:#c4605a20;padding:2px 6px;border-radius:10px;">{absence_count}x</span>' if absence_count > 0 else ''
-                st.markdown(f'<div style="text-align:center;color:{color};font-weight:600;font-size:13px;">{name} {badge}</div></div>', unsafe_allow_html=True)
+                badge = (
+                    f'<span style="font-size:10px;background:#c4605a20;padding:2px 6px;border-radius:10px;">{absence_count}x</span>'
+                    if absence_count > 0
+                    else ""
+                )
+                st.markdown(
+                    f'<div style="text-align:center;color:{color};font-weight:600;font-size:13px;">{name} {badge}</div></div>',
+                    unsafe_allow_html=True,
+                )
     else:
         st.success("Everyone's here today!")
+
 
 # ---- Mode content ----
 if st.session_state.mode == "upload":
