@@ -31,26 +31,18 @@ def lazy_import_rembg():
     from rembg import remove
     return remove
 
-# אחרי שקיבלת class_file מה‑file_uploader
-if class_file is not None:
-    class_image = Image.open(class_file)
-    class_image = ImageOps.exif_transpose(class_image)
-    if max(class_image.size) > 1200:
-        class_image.thumbnail((1200, 1200))
+try:
+    DeepFace = lazy_import_deepface()
+except Exception as e:
+    DeepFace = None
+    print("Lazy import DeepFace failed:", repr(e))
 
-    # בדיקה עם debug
-    try:
-        faces, img = extract_faces(class_image, confidence_threshold=0.5, debug=True)
-        print("DEBUG: extract_faces returned", len(faces), "faces")
-    except Exception as e:
-        import traceback
-        print("ERROR calling extract_faces:", repr(e))
-        traceback.print_exc()
-        st.error(f"extract_faces crashed: {e}")
-        st.stop()
+try:
+    remove = lazy_import_rembg()
+except Exception as e:
+    remove = None
+    print("Lazy import rembg failed:", repr(e))
 
-    # המשך: קריאה ל‑recognize_faces אם רוצים
-    # results = recognize_faces(class_image, confidence=0.5, threshold=0.4)
 
 st.set_page_config(
     page_title="Smart Attendance",
@@ -60,6 +52,30 @@ st.set_page_config(
 
 if "mode" not in st.session_state:
     st.session_state.mode = "upload"
+    # בתוך הבלוק: if st.session_state.mode == "upload":
+    class_file = st.file_uploader("", type=["jpg","jpeg","png"], label_visibility="collapsed")
+    if class_file is not None:
+        class_image = Image.open(class_file)
+        class_image = ImageOps.exif_transpose(class_image)
+        if max(class_image.size) > 1200:
+            class_image.thumbnail((1200, 1200))
+    
+        # --- בדיקת extract_faces עם debug ---
+        try:
+            faces, img = extract_faces(class_image, confidence_threshold=0.5, debug=True)
+            print("DEBUG: extract_faces returned", len(faces), "faces")
+            for i, f in enumerate(faces):
+                print(f"face[{i}] box={f['box']} conf={f['confidence']} type={type(f['face'])}")
+        except Exception as e:
+            import traceback
+            print("ERROR calling extract_faces:", repr(e))
+            traceback.print_exc()
+            st.error(f"extract_faces crashed: {e}")
+            st.stop()
+    
+        # אם רוצים להמשיך להריץ את ה‑recognize:
+        # recognize_faces(class_image, confidence=0.5, threshold=0.4)
+
 if "collected_photos" not in st.session_state:
     st.session_state.collected_photos = []
 if "last_results" not in st.session_state:
