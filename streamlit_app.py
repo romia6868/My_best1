@@ -697,79 +697,135 @@ def generate_class_image():
 
     return np.array(bg_pil.convert("RGB")), present
 
-def extract_faces(image_pil, confidence_threshold=0.7, detector_backend="retinaface", debug=False):
+def extract_faces(image_pil, confidence_threshold=0.7, debug=False):
     """
-    מחזירה:
-      - faces: רשימת dict עם keys: face (PIL), box [x,y,w,h], confidence (float)
-      - original_img_rgb: numpy RGB של התמונה המקורית
-
-    image_pil יכול להיות PIL.Image
-    detector_backend ברירת מחדל retinaface; אפשר לנסות "mtcnn" אם צריך
+    Robust face extraction wrapper for DeepFace.extract_faces.
+    Returns: (faces, original_img_rgb)
+    faces: list of dict { "face": PIL.Image, "box": [x,y,w,h], "confidence": float }
     """
-    # תמונה מקורית כ‑numpy RGB
+    # prepare original image
     original_img_rgb = np.array(image_pil.convert("RGB"))
     faces = []
 
+    # ensure DeepFace is available
     try:
-        # DeepFace.extract_faces מצפה ל‑PIL או לנתיב קובץ; שולחים PIL
-        detections = DeepFace.extract_faces(
-            img_path=image_pil,
-            detector_backend=detector_backend,
-            enforce_detection=False
-        )
+        DeepFace  # noqa: F821
+    except Exception as e:
+        print("extract_faces: DeepFace not imported:", repr(e))
+        return faces, original_img_rgb
 
+    # candidate backends to try (order chosen for robustness)
+    backends = ["retinaface", "mtcnn", "opencv", "ssd"]
+    # try each backend until we get detections
+    detections = []
+    last_exc = None
+
+    # optionally upscale small images to help detectors
+    h, w = original_img_rgb.shape[:2]
+    scale_img = image_pil
+    if max(h, w) < 800:
+        scale = int(800 / max(h, w) * 100) / 100.0
+        try:
+            new_w = int(w * scale)
+            new_h = int(h * scale)
+            scale_img = image_pil.resize((new_w, new_h), Image.LANCZOS)
+            if debug:
+                print(f"extract_faces: upscaled image from {(w,h)} to {(new_w,new_h)} scale={scale}")
+        except Exception as e:
+            if debug:
+                print("extract_faces: upscale failed", repr(e))
+
+    for backend in backends:
+        try:
+            if debug:
+                print("extract_faces: trying backend", backend)
+            detections = DeepFace.extract_faces(
+                img_path=scale_img,
+                detector_backend=backend,
+                enforce_detection=False
+            )
+            if detections and len(detections) > 0:
+                if debug:
+                    print(f"extract_faces: backend {backend} returned {len(detections)} detections")
+                break
+        except Exception as e:
+            last_exc = e
+            if debug:
+                print(f"extract_faces: backend {backend} raised {repr(e)}")
+            detections = []
+
+    if not detections:
         if debug:
-            print("extract_faces: detections count =", len(detections))
+            print("extract_faces: no detections from any backend", repr(last_exc))
+        return faces, original_img_rgb
 
-        for det in detections:
-            conf = det.get("confidence", 0) or 0
+    # normalize detections into expected format
+    for det_idx, det in enumerate(detections):
+        try:
+            conf = det.get("confidence", 0) or 0.0
             if conf < confidence_threshold:
                 if debug:
-                    print("skipping low confidence:", conf)
+                    print(f"extract_faces: skipping detection {det_idx} low conf {conf}")
                 continue
 
-            # הפנים החתוכות בדרך כלל ב det["face"] כ‑numpy BGR/RGB
-            face_img_arr = det.get("face", None)
-            if face_img_arr is None:
-                if debug:
-                    print("no face crop in detection, skipping")
-                continue
-
-            # המרת crop ל‑PIL
-            face_pil = Image.fromarray(face_img_arr)
-
-            # facial_area יכול להיות dict עם x,y,w,h או left,top,right,bottom
-            fa = det.get("facial_area", {}) or {}
-            if "x" in fa and "y" in fa and "w" in fa and "h" in fa:
-                box = [int(fa.get("x", 0)), int(fa.get("y", 0)), int(fa.get("w", 0)), int(fa.get("h", 0))]
-            elif "left" in fa and "top" in fa and "right" in fa and "bottom" in fa:
-                x = int(fa.get("left", 0))
-                y = int(fa.get("top", 0))
-                w = int(fa.get("right", 0)) - x
-                h = int(fa.get("bottom", 0)) - y
-                box = [x, y, w, h]
-            else:
-                # ניסיון לגזור מתוך bbox אם קיים כמערך
-                bbox = det.get("region") or det.get("box") or det.get("facial_area")
-                if isinstance(bbox, (list, tuple)) and len(bbox) >= 4:
-                    box = [int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])]
+            face_crop = det.get("face", None)
+            if face_crop is None:
+                # some backends return 'region' or 'facial_area' only; try to crop manually
+                fa = det.get("facial_area", {}) or det.get("region", {}) or det.get("box", {})
+                if isinstance(fa, dict) and all(k in fa for k in ("x","y","w","h")):
+                    x = int(fa.get("x",0)); y = int(fa.get("y",0)); w_box = int(fa.get("w",0)); h_box = int(fa.get("h",0))
+                    face_arr = original_img_rgb[y:y+h_box, x:x+w_box]
+                    if face_arr.size == 0:
+                        if debug:
+                            print("extract_faces: manual crop empty, skipping")
+                        continue
+                    face_crop = face_arr
                 else:
-                    # ברירת מחדל: כל התמונה
+                    if debug:
+                        print("extract_faces: no face crop and cannot manual crop, skipping")
+                    continue
+
+            # convert face crop to PIL if needed
+            if isinstance(face_crop, np.ndarray):
+                face_pil = Image.fromarray(face_crop)
+            elif isinstance(face_crop, Image.Image):
+                face_pil = face_crop
+            else:
+                # unknown type, try to convert
+                try:
+                    face_pil = Image.fromarray(np.array(face_crop))
+                except Exception:
+                    if debug:
+                        print("extract_faces: unknown face crop type, skipping")
+                    continue
+
+            # normalize box to [x,y,w,h]
+            fa = det.get("facial_area", {}) or det.get("region", {}) or det.get("box", {})
+            if isinstance(fa, dict):
+                if "x" in fa and "y" in fa and "w" in fa and "h" in fa:
+                    box = [int(fa.get("x",0)), int(fa.get("y",0)), int(fa.get("w",0)), int(fa.get("h",0))]
+                elif "left" in fa and "top" in fa and "right" in fa and "bottom" in fa:
+                    x = int(fa.get("left",0)); y = int(fa.get("top",0))
+                    box = [x, y, int(fa.get("right",0)) - x, int(fa.get("bottom",0)) - y]
+                else:
                     box = [0, 0, original_img_rgb.shape[1], original_img_rgb.shape[0]]
+            elif isinstance(fa, (list, tuple)) and len(fa) >= 4:
+                box = [int(fa[0]), int(fa[1]), int(fa[2]), int(fa[3])]
+            else:
+                box = [0, 0, original_img_rgb.shape[1], original_img_rgb.shape[0]]
 
             faces.append({
                 "face": face_pil,
                 "box": box,
                 "confidence": float(conf)
             })
+            if debug:
+                print(f"extract_faces: appended face idx={det_idx} box={box} conf={conf}")
 
-        if debug:
-            for i, f in enumerate(faces):
-                print(f"face {i}: box={f['box']} conf={f['confidence']}")
-
-    except Exception as e:
-        # אל תעצור את האפליקציה — הדפס לוג לשורת השרת
-        print("Face extraction error:", repr(e))
+        except Exception as e:
+            if debug:
+                print("extract_faces: per-detection error", repr(e))
+            continue
 
     return faces, original_img_rgb
 
@@ -791,6 +847,10 @@ def get_embedding_siamese(face_img):
     img_arr = np.expand_dims(img_arr, axis=0)
     emb = siamese_model.predict(img_arr, verbose=0)[0]
     return emb
+faces, img = extract_faces(class_image, confidence_threshold=0.5, debug=True)
+print("DEBUG: faces returned:", len(faces))
+for i,f in enumerate(faces):
+    print(i, f["box"], f["confidence"], type(f["face"]))
 
 
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
