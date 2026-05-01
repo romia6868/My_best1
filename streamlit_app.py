@@ -698,18 +698,12 @@ def generate_class_image():
     return np.array(bg_pil.convert("RGB")), present
 
 def extract_faces(image_pil, confidence_threshold=0.7):
-    """
-    מחזירה:
-    - faces: רשימת פנים עם crop + box + confidence
-    - original_img_rgb: התמונה המקורית כ‑numpy
-    """
-
     img_rgb = np.array(image_pil.convert("RGB"))
     faces = []
 
     try:
         detections = DeepFace.extract_faces(
-            img_path=image_pil,   # ⭐ חשוב! לא numpy
+            img_path=image_pil,
             detector_backend="retinaface",
             enforce_detection=False
         )
@@ -720,7 +714,14 @@ def extract_faces(image_pil, confidence_threshold=0.7):
                 continue
 
             face_img = det["face"]
-            box = det.get("facial_area", {})
+
+            fa = det.get("facial_area", {})
+            box = [
+                fa.get("x", 0),
+                fa.get("y", 0),
+                fa.get("w", 0),
+                fa.get("h", 0)
+            ]
 
             faces.append({
                 "face": Image.fromarray(face_img),
