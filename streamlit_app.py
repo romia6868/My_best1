@@ -697,42 +697,81 @@ def generate_class_image():
 
     return np.array(bg_pil.convert("RGB")), present
 
-def extract_faces(image_pil, confidence_threshold=0.7):
-    img_rgb = np.array(image_pil.convert("RGB"))
+def extract_faces(image_pil, confidence_threshold=0.7, detector_backend="retinaface", debug=False):
+    """
+    מחזירה:
+      - faces: רשימת dict עם keys: face (PIL), box [x,y,w,h], confidence (float)
+      - original_img_rgb: numpy RGB של התמונה המקורית
+
+    image_pil יכול להיות PIL.Image
+    detector_backend ברירת מחדל retinaface; אפשר לנסות "mtcnn" אם צריך
+    """
+    # תמונה מקורית כ‑numpy RGB
+    original_img_rgb = np.array(image_pil.convert("RGB"))
     faces = []
 
     try:
+        # DeepFace.extract_faces מצפה ל‑PIL או לנתיב קובץ; שולחים PIL
         detections = DeepFace.extract_faces(
             img_path=image_pil,
-            detector_backend="retinaface",
+            detector_backend=detector_backend,
             enforce_detection=False
         )
 
+        if debug:
+            print("extract_faces: detections count =", len(detections))
+
         for det in detections:
-            conf = det.get("confidence", 0)
+            conf = det.get("confidence", 0) or 0
             if conf < confidence_threshold:
+                if debug:
+                    print("skipping low confidence:", conf)
                 continue
 
-            face_img = det["face"]
+            # הפנים החתוכות בדרך כלל ב det["face"] כ‑numpy BGR/RGB
+            face_img_arr = det.get("face", None)
+            if face_img_arr is None:
+                if debug:
+                    print("no face crop in detection, skipping")
+                continue
 
-            fa = det.get("facial_area", {})
-            box = [
-                fa.get("x", 0),
-                fa.get("y", 0),
-                fa.get("w", 0),
-                fa.get("h", 0)
-            ]
+            # המרת crop ל‑PIL
+            face_pil = Image.fromarray(face_img_arr)
+
+            # facial_area יכול להיות dict עם x,y,w,h או left,top,right,bottom
+            fa = det.get("facial_area", {}) or {}
+            if "x" in fa and "y" in fa and "w" in fa and "h" in fa:
+                box = [int(fa.get("x", 0)), int(fa.get("y", 0)), int(fa.get("w", 0)), int(fa.get("h", 0))]
+            elif "left" in fa and "top" in fa and "right" in fa and "bottom" in fa:
+                x = int(fa.get("left", 0))
+                y = int(fa.get("top", 0))
+                w = int(fa.get("right", 0)) - x
+                h = int(fa.get("bottom", 0)) - y
+                box = [x, y, w, h]
+            else:
+                # ניסיון לגזור מתוך bbox אם קיים כמערך
+                bbox = det.get("region") or det.get("box") or det.get("facial_area")
+                if isinstance(bbox, (list, tuple)) and len(bbox) >= 4:
+                    box = [int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])]
+                else:
+                    # ברירת מחדל: כל התמונה
+                    box = [0, 0, original_img_rgb.shape[1], original_img_rgb.shape[0]]
 
             faces.append({
-                "face": Image.fromarray(face_img),
+                "face": face_pil,
                 "box": box,
-                "confidence": conf
+                "confidence": float(conf)
             })
 
-    except Exception as e:
-        print("Face extraction error:", e)
+        if debug:
+            for i, f in enumerate(faces):
+                print(f"face {i}: box={f['box']} conf={f['confidence']}")
 
-    return faces, img_rgb
+    except Exception as e:
+        # אל תעצור את האפליקציה — הדפס לוג לשורת השרת
+        print("Face extraction error:", repr(e))
+
+    return faces, original_img_rgb
 
 
 
