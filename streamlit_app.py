@@ -31,6 +31,18 @@ def lazy_import_rembg():
     from rembg import remove
     return remove
 
+# Ensure DeepFace and rembg are imported once and available globally
+try:
+    DeepFace = lazy_import_deepface()
+except Exception as e:
+    DeepFace = None
+    print("Lazy import DeepFace failed:", repr(e))
+
+try:
+    remove = lazy_import_rembg()
+except Exception as e:
+    remove = None
+    print("Lazy import rembg failed:", repr(e))
 
 st.set_page_config(
     page_title="Smart Attendance",
@@ -698,137 +710,108 @@ def generate_class_image():
     return np.array(bg_pil.convert("RGB")), present
 
 def extract_faces(image_pil, confidence_threshold=0.7, debug=False):
-    """
-    Robust face extraction wrapper for DeepFace.extract_faces.
-    Returns: (faces, original_img_rgb)
-    faces: list of dict { "face": PIL.Image, "box": [x,y,w,h], "confidence": float }
-    """
-    # prepare original image
+    import traceback
     original_img_rgb = np.array(image_pil.convert("RGB"))
     faces = []
 
-    # ensure DeepFace is available
-    try:
-        DeepFace  # noqa: F821
-    except Exception as e:
-        print("extract_faces: DeepFace not imported:", repr(e))
+    if DeepFace is None:
+        if debug:
+            print("extract_faces: DeepFace is None (not imported)")
         return faces, original_img_rgb
 
-    # candidate backends to try (order chosen for robustness)
-    backends = ["retinaface", "mtcnn", "opencv", "ssd"]
-    # try each backend until we get detections
-    detections = []
-    last_exc = None
-
-    # optionally upscale small images to help detectors
-    h, w = original_img_rgb.shape[:2]
-    scale_img = image_pil
-    if max(h, w) < 800:
-        scale = int(800 / max(h, w) * 100) / 100.0
-        try:
-            new_w = int(w * scale)
-            new_h = int(h * scale)
-            scale_img = image_pil.resize((new_w, new_h), Image.LANCZOS)
-            if debug:
-                print(f"extract_faces: upscaled image from {(w,h)} to {(new_w,new_h)} scale={scale}")
-        except Exception as e:
-            if debug:
-                print("extract_faces: upscale failed", repr(e))
-
-    for backend in backends:
-        try:
-            if debug:
-                print("extract_faces: trying backend", backend)
-            detections = DeepFace.extract_faces(
-                img_path=scale_img,
-                detector_backend=backend,
-                enforce_detection=False
-            )
-            if detections and len(detections) > 0:
+    try:
+        # try retinaface first, then mtcnn as fallback
+        for backend in ("retinaface", "mtcnn", "opencv"):
+            try:
+                if debug:
+                    print("extract_faces: trying backend", backend)
+                detections = DeepFace.extract_faces(
+                    img_path=image_pil,
+                    detector_backend=backend,
+                    enforce_detection=False
+                )
                 if debug:
                     print(f"extract_faces: backend {backend} returned {len(detections)} detections")
-                break
-        except Exception as e:
-            last_exc = e
-            if debug:
-                print(f"extract_faces: backend {backend} raised {repr(e)}")
+                    if len(detections) > 0:
+                        print("sample detection keys:", list(detections[0].keys()))
+                if detections:
+                    break
+            except Exception as e:
+                if debug:
+                    print(f"extract_faces: backend {backend} exception:", repr(e))
+                detections = []
+        else:
             detections = []
 
-    if not detections:
-        if debug:
-            print("extract_faces: no detections from any backend", repr(last_exc))
-        return faces, original_img_rgb
+        if not detections:
+            if debug:
+                print("extract_faces: no detections from any backend")
+            return faces, original_img_rgb
 
-    # normalize detections into expected format
-    for det_idx, det in enumerate(detections):
-        try:
-            conf = det.get("confidence", 0) or 0.0
-            if conf < confidence_threshold:
+        for idx, det in enumerate(detections):
+            try:
                 if debug:
-                    print(f"extract_faces: skipping detection {det_idx} low conf {conf}")
+                    print(f"det[{idx}] keys:", list(det.keys()))
+                conf = det.get("confidence", 0) or 0.0
+                if conf < confidence_threshold:
+                    if debug:
+                        print(f"det[{idx}] low confidence {conf}, skipping")
+                    continue
+
+                face_crop = det.get("face", None)
+                if face_crop is None:
+                    # try to crop from facial_area
+                    fa = det.get("facial_area", {}) or det.get("region", {}) or det.get("box", {})
+                    if isinstance(fa, dict) and all(k in fa for k in ("x","y","w","h")):
+                        x = int(fa["x"]); y = int(fa["y"]); w_box = int(fa["w"]); h_box = int(fa["h"])
+                        face_crop = original_img_rgb[y:y+h_box, x:x+w_box]
+                    else:
+                        if debug:
+                            print(f"det[{idx}] no face crop and cannot manual crop, skipping")
+                        continue
+
+                # normalize face crop to PIL
+                if isinstance(face_crop, np.ndarray):
+                    face_pil = Image.fromarray(face_crop)
+                elif isinstance(face_crop, Image.Image):
+                    face_pil = face_crop
+                else:
+                    try:
+                        face_pil = Image.fromarray(np.array(face_crop))
+                    except Exception:
+                        if debug:
+                            print(f"det[{idx}] unknown face crop type, skipping")
+                        continue
+
+                fa = det.get("facial_area", {}) or det.get("region", {}) or det.get("box", {})
+                if isinstance(fa, dict):
+                    if "x" in fa and "y" in fa and "w" in fa and "h" in fa:
+                        box = [int(fa.get("x",0)), int(fa.get("y",0)), int(fa.get("w",0)), int(fa.get("h",0))]
+                    elif "left" in fa and "top" in fa and "right" in fa and "bottom" in fa:
+                        x = int(fa.get("left",0)); y = int(fa.get("top",0))
+                        box = [x, y, int(fa.get("right",0)) - x, int(fa.get("bottom",0)) - y]
+                    else:
+                        box = [0,0,original_img_rgb.shape[1], original_img_rgb.shape[0]]
+                elif isinstance(fa, (list, tuple)) and len(fa) >= 4:
+                    box = [int(fa[0]), int(fa[1]), int(fa[2]), int(fa[3])]
+                else:
+                    box = [0,0,original_img_rgb.shape[1], original_img_rgb.shape[0]]
+
+                faces.append({"face": face_pil, "box": box, "confidence": float(conf)})
+                if debug:
+                    print(f"extract_faces: appended face idx={idx} box={box} conf={conf}")
+
+            except Exception as e:
+                if debug:
+                    print(f"extract_faces: per-detection error idx={idx}:", repr(e))
                 continue
 
-            face_crop = det.get("face", None)
-            if face_crop is None:
-                # some backends return 'region' or 'facial_area' only; try to crop manually
-                fa = det.get("facial_area", {}) or det.get("region", {}) or det.get("box", {})
-                if isinstance(fa, dict) and all(k in fa for k in ("x","y","w","h")):
-                    x = int(fa.get("x",0)); y = int(fa.get("y",0)); w_box = int(fa.get("w",0)); h_box = int(fa.get("h",0))
-                    face_arr = original_img_rgb[y:y+h_box, x:x+w_box]
-                    if face_arr.size == 0:
-                        if debug:
-                            print("extract_faces: manual crop empty, skipping")
-                        continue
-                    face_crop = face_arr
-                else:
-                    if debug:
-                        print("extract_faces: no face crop and cannot manual crop, skipping")
-                    continue
-
-            # convert face crop to PIL if needed
-            if isinstance(face_crop, np.ndarray):
-                face_pil = Image.fromarray(face_crop)
-            elif isinstance(face_crop, Image.Image):
-                face_pil = face_crop
-            else:
-                # unknown type, try to convert
-                try:
-                    face_pil = Image.fromarray(np.array(face_crop))
-                except Exception:
-                    if debug:
-                        print("extract_faces: unknown face crop type, skipping")
-                    continue
-
-            # normalize box to [x,y,w,h]
-            fa = det.get("facial_area", {}) or det.get("region", {}) or det.get("box", {})
-            if isinstance(fa, dict):
-                if "x" in fa and "y" in fa and "w" in fa and "h" in fa:
-                    box = [int(fa.get("x",0)), int(fa.get("y",0)), int(fa.get("w",0)), int(fa.get("h",0))]
-                elif "left" in fa and "top" in fa and "right" in fa and "bottom" in fa:
-                    x = int(fa.get("left",0)); y = int(fa.get("top",0))
-                    box = [x, y, int(fa.get("right",0)) - x, int(fa.get("bottom",0)) - y]
-                else:
-                    box = [0, 0, original_img_rgb.shape[1], original_img_rgb.shape[0]]
-            elif isinstance(fa, (list, tuple)) and len(fa) >= 4:
-                box = [int(fa[0]), int(fa[1]), int(fa[2]), int(fa[3])]
-            else:
-                box = [0, 0, original_img_rgb.shape[1], original_img_rgb.shape[0]]
-
-            faces.append({
-                "face": face_pil,
-                "box": box,
-                "confidence": float(conf)
-            })
-            if debug:
-                print(f"extract_faces: appended face idx={det_idx} box={box} conf={conf}")
-
-        except Exception as e:
-            if debug:
-                print("extract_faces: per-detection error", repr(e))
-            continue
+    except Exception as e:
+        if debug:
+            print("extract_faces: outer exception:", repr(e))
+            traceback.print_exc()
 
     return faces, original_img_rgb
-
 
 
 
@@ -847,10 +830,16 @@ def get_embedding_siamese(face_img):
     img_arr = np.expand_dims(img_arr, axis=0)
     emb = siamese_model.predict(img_arr, verbose=0)[0]
     return emb
-faces, img = extract_faces(class_image, confidence_threshold=0.5, debug=True)
-print("DEBUG: faces returned:", len(faces))
-for i,f in enumerate(faces):
-    print(i, f["box"], f["confidence"], type(f["face"]))
+try:
+    faces, img = extract_faces(class_image, confidence_threshold=0.5, debug=True)
+    print("DEBUG: extract_faces returned", len(faces), "faces")
+except Exception as e:
+    import traceback
+    print("ERROR calling extract_faces:", repr(e))
+    traceback.print_exc()
+    st.error(f"extract_faces crashed: {e}")
+    # stop further processing for now
+    st.stop()
 
 
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
