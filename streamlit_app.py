@@ -1,4 +1,4 @@
-```python
+
 # streamlit_app_fixed.py
 import sys
 import os
