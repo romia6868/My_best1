@@ -697,10 +697,14 @@ def generate_class_image():
 
     return np.array(bg_pil.convert("RGB")), present
 
+def extract_faces(image_pil, confidence_threshold=0.7):
+    """
+    מחזירה:
+    - faces: רשימת פנים עם crop + box + confidence
+    - original_img_rgb: התמונה המקורית כ‑numpy
+    """
 
-def extract_faces(image, confidence_threshold=0.7):
-    
-    img_rgb = np.array(image.convert("RGB"))
+    img_rgb = np.array(image_pil.convert("RGB"))
     faces = []
 
     try:
@@ -727,7 +731,8 @@ def extract_faces(image, confidence_threshold=0.7):
     except Exception as e:
         print("Face extraction error:", e)
 
-    return faces
+    return faces, img_rgb
+
 
 
 def cosine_distance(a, b):
