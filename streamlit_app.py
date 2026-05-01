@@ -1,8 +1,5 @@
-
-### Streamlit app (final optimized)
-
 ```python
-# streamlit_app.py
+# streamlit_app_fixed.py
 import sys
 import os
 import traceback
@@ -17,7 +14,7 @@ from PIL import Image, ImageOps, ImageDraw, ImageFont
 import numpy as np
 import pandas as pd
 
-# --- Lazy imports for optional heavy libs ---
+# --- Lazy imports for heavy optional libs ---
 def lazy_import_deepface():
     try:
         from deepface import DeepFace
@@ -538,7 +535,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     else:
         st.success("Everyone's here today!")
 
-# --- UI and sidebar (minimal CSS omitted for brevity) ---
+# --- UI and sidebar (minimal) ---
 st.title("Smart Attendance")
 
 with st.sidebar:
@@ -605,13 +602,16 @@ elif st.session_state.mode == "random":
     st.markdown('<p class="mode-desc">Generate a random class photo with students on a classroom background.</p>', unsafe_allow_html=True)
     if st.button("Generate Class Photo", key="gen_btn", type="primary"):
         with st.spinner("Generating class photo..."):
-            result_img, present = generate_class_image()
-        pil_image = Image.fromarray(result_img)
-        st.image(pil_image, use_column_width=True)
-        present_str = ", ".join(present) if present else "Nobody"
-        st.markdown(f'<p style="color:#b09080;font-size:13px;margin:8px 0;">Actually present: <span style="color:#c99566;font-weight:600;">{present_str}</span></p>', unsafe_allow_html=True)
-        st.markdown("---")
-        recognize_faces(pil_image, confidence_threshold=confidence, threshold=threshold)
+            try:
+                result_img, present = generate_class_image()
+                pil_image = Image.fromarray(result_img)
+                st.image(pil_image, use_column_width=True)
+                present_str = ", ".join(present) if present else "Nobody"
+                st.markdown(f'<p style="color:#b09080;font-size:13px;margin:8px 0;">Actually present: <span style="color:#c99566;font-weight:600;">{present_str}</span></p>', unsafe_allow_html=True)
+                st.markdown("---")
+                recognize_faces(pil_image, confidence_threshold=confidence, threshold=threshold)
+            except Exception as e:
+                st.error(f"Generate failed: {e}")
 
 elif st.session_state.mode == "camera":
     st.markdown('<p class="mode-desc">Take a photo directly from your camera.</p>', unsafe_allow_html=True)
