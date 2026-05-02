@@ -900,7 +900,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     updated_absences = update_absences(missing)
-   st.session_state.last_results = {
+    st.session_state.last_results = {
     "present": list(known_present.keys()),   
     "missing": missing,
     "date": date_str
