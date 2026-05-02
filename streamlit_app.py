@@ -1,43 +1,43 @@
-
-# streamlit_app_fixed.py
 import sys
 import os
 import traceback
+
+# --- בדיקת cv2 בצורה בטוחה ---
+try:
+    import cv2
+    print("cv2 OK:", cv2.__version__)
+except Exception as e:
+    print("cv2 FULL ERROR:", repr(e))
+    traceback.print_exc()
+
+# --- ספריות כלליות ---
+import streamlit as st
+from PIL import Image, ImageOps, ImageDraw, ImageFont
+import numpy as np
 import zipfile
 import random
 import json
 from datetime import datetime
+import pandas as pd
 from io import BytesIO
 
-import streamlit as st
-from PIL import Image, ImageOps, ImageDraw, ImageFont
-import numpy as np
-import pandas as pd
-
-# --- Lazy imports for heavy optional libs ---
 def lazy_import_deepface():
-    try:
-        from deepface import DeepFace
-        return DeepFace
-    except Exception as e:
-        print("lazy_import_deepface failed:", repr(e))
-        return None
+    from deepface import DeepFace
+    return DeepFace
 
 def lazy_import_rembg():
-    try:
-        from rembg import remove
-        return remove
-    except Exception as e:
-        print("lazy_import_rembg failed:", repr(e))
-        return None
+    from rembg import remove
+    return remove
 
 DeepFace = lazy_import_deepface()
 remove = lazy_import_rembg()
 
-# --- Page config ---
-st.set_page_config(page_title="Smart Attendance", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(
+    page_title="Smart Attendance",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# --- Session defaults ---
 if "mode" not in st.session_state:
     st.session_state.mode = "upload"
 if "collected_photos" not in st.session_state:
@@ -49,18 +49,190 @@ if "absence_counter" not in st.session_state:
 if "model_choice" not in st.session_state:
     st.session_state.model_choice = "DeepFace Facenet512"
 
-# --- Constants and paths ---
 ABSENCE_THRESHOLD = 3
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SIAMESE_WEIGHTS_PATH = os.path.join(BASE_DIR, "my_siamese3_weights.weights.h5")
-SIAMESE_THRESHOLD = 0.49
+SIAMESE_WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "my_siamese3_weights.weights.h5")
+SIAMESE_THRESHOLD = 0.49  # Best Threshold (95% Recall)
 
+css = """
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"/>
+<style>
+* { font-family: 'Space Grotesk', sans-serif !important; }
+.material-symbols-outlined {
+    font-family: 'Material Symbols Outlined' !important;
+    font-weight: normal; font-style: normal; font-size: 22px;
+    line-height: 1; letter-spacing: normal; text-transform: none;
+    display: inline-block; white-space: nowrap;
+    -webkit-font-feature-settings: 'liga'; font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+}
+@keyframes pulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 #b8a9c940; }
+    50% { transform: scale(1.06); box-shadow: 0 0 0 8px #b8a9c900; }
+}
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+    0% { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+}
+@keyframes progressFill { from { width: 0%; } }
+@keyframes scanLine {
+    0% { top: 0%; opacity: 1; }
+    100% { top: 100%; opacity: 0.3; }
+}
+.stApp { background: #f0eef4 !important; }
+.main-header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 1.5rem 0 1rem;
+    border-bottom: 1px solid #e4dff0;
+    margin-bottom: 1.5rem;
+}
+.header-icon {
+    width: 52px; height: 52px;
+    background: linear-gradient(135deg, #b8a9c9, #9585b0);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    animation: pulse 3s ease-in-out infinite;
+}
+.header-icon .material-symbols-outlined { font-size: 28px; color: white; }
+.header-title {
+    font-size: 28px; font-weight: 700;
+    background: linear-gradient(90deg, #6b5a8a, #9585b0, #c4b8d8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.scan-container { position: relative; display: inline-block; width: 100%; }
+.scan-overlay {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; z-index: 10; border-radius: 8px; overflow: hidden;
+}
+.scan-line {
+    position: absolute; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent, #b8a9c9, #c4b8d8, #b8a9c9, transparent);
+    animation: scanLine 1.5s ease-in-out infinite;
+    box-shadow: 0 0 12px #b8a9c980;
+}
+.upload-zone {
+    border: 1.5px dashed #c4b8d8;
+    border-radius: 14px; padding: 2.5rem;
+    text-align: center; background: #ebe8f240;
+    margin-bottom: 1rem; transition: all 0.2s;
+}
+.upload-zone:hover { border-color: #9585b0; background: #ebe8f260; }
+.upload-zone .material-symbols-outlined { font-size: 44px; color: #9585b0; }
+.upload-text { font-size: 15px; color: #4a3a6a; margin: 8px 0 4px; font-weight: 500; }
+.upload-sub { font-size: 12px; color: #a098b8; }
+.stat-row { display: flex; gap: 12px; margin: 1.5rem 0; }
+.stat-card {
+    flex: 1; background: #fff;
+    border: 1px solid #e4dff0;
+    border-radius: 12px; padding: 16px 18px;
+    transition: all 0.2s; position: relative; overflow: hidden;
+}
+.stat-card::after {
+    content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, #ebe8f230, transparent);
+    background-size: 400px 100%; animation: shimmer 2.5s infinite;
+}
+.stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px #b8a9c920; border-color: #c4b8d8; }
+.stat-label {
+    font-size: 11px; color: #a098b8; text-transform: uppercase; letter-spacing: 0.5px;
+    display: flex; align-items: center; gap: 5px; margin-bottom: 6px;
+}
+.stat-label .material-symbols-outlined { font-size: 14px; }
+.stat-val { font-size: 28px; font-weight: 700; }
+.stat-sub { font-size: 11px; color: #c4b8d8; margin-top: 3px; }
+.stat-green { color: #68b88a; }
+.stat-red { color: #d4707a; }
+.stat-gold { background: linear-gradient(90deg,#6b5a8a,#b8a9c9); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.progress-container { background: #ebe8f2; border-radius: 8px; height: 6px; margin: 8px 0 16px; overflow: hidden; }
+.progress-bar { height: 100%; background: linear-gradient(90deg, #b8a9c9, #c4b8d8); border-radius: 8px; animation: progressFill 1.5s ease-out forwards; }
+.section-divider { display: flex; align-items: center; gap: 12px; margin: 1.8rem 0 1.2rem; }
+.divider-line { flex: 1; height: 1px; background: #e4dff0; }
+.divider-badge { font-size: 12px; padding: 4px 14px; border-radius: 20px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+.divider-badge .material-symbols-outlined { font-size: 15px; }
+.badge-present { background: #68b88a20; color: #68b88a; }
+.badge-absent { background: #d4707a20; color: #d4707a; }
+.badge-unknown { background: #e8a85020; color: #e8a850; }
+.student-card { animation: fadeInUp 0.4s ease both; text-align: center; }
+.student-card:nth-child(1) { animation-delay: 0.05s; }
+.student-card:nth-child(2) { animation-delay: 0.10s; }
+.student-card:nth-child(3) { animation-delay: 0.15s; }
+.student-card:nth-child(4) { animation-delay: 0.20s; }
+.student-card:nth-child(5) { animation-delay: 0.25s; }
+[data-testid="stSidebar"] { background: #e8e4f0 !important; border-right: 1px solid #e4dff0 !important; }
+.sidebar-title { font-size: 15px; font-weight: 700; color: #4a3a6a; margin-bottom: 1rem; display: flex; align-items: center; gap: 6px; }
+.sidebar-title .material-symbols-outlined { font-size: 18px; color: #9585b0; }
+.sidebar-student {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; background: #f0eef4;
+    border-radius: 8px; margin-bottom: 6px;
+    font-size: 13px; color: #4a3a6a;
+    border: 1px solid #e4dff0;
+    transition: all 0.2s; cursor: default;
+}
+.sidebar-student:hover { border-color: #b8a9c9; transform: translateX(4px); box-shadow: 2px 0 8px #b8a9c920; }
+.sidebar-student .material-symbols-outlined { font-size: 16px; color: #9585b0; }
+.mode-desc { color: #a098b8; font-size: 14px; margin-bottom: 1rem; }
+.model-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    margin-bottom: 1rem;
+}
+.model-badge-deepface { background: #9585b020; color: #9585b0; border: 1px solid #9585b040; }
+.model-badge-siamese { background: #68b88a20; color: #68b88a; border: 1px solid #68b88a40; }
+</style>
+"""
+
+button_css = """
+<style>
+.stButton > button {
+    background: #ebe8f2 !important; color: #4a3a6a !important;
+    border: 1.5px solid #e4dff0 !important; border-radius: 10px !important;
+    padding: 11px 16px !important; font-size: 14px !important;
+    font-weight: 500 !important; width: 100% !important;
+    transition: all 0.2s !important;
+    font-family: 'Space Grotesk', sans-serif !important; margin-top: 0 !important;
+}
+.stButton > button:hover {
+    border-color: #9585b0 !important; transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px #b8a9c930 !important;
+}
+.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #b8a9c9, #9585b0) !important;
+    color: white !important; border: none !important;
+    box-shadow: 0 4px 14px #b8a9c940 !important;
+    padding: 13px 28px !important; font-size: 15px !important;
+    font-weight: 600 !important; margin-top: 12px !important;
+}
+.stButton > button[kind="primary"]:hover {
+    filter: brightness(1.08) !important; transform: translateY(-2px) !important;
+}
+.stDownloadButton > button {
+    background: #ebe8f2 !important; color: #9585b0 !important;
+    border: 1.5px solid #b8a9c9 !important; border-radius: 10px !important;
+    font-size: 13px !important; font-weight: 600 !important;
+    width: 100% !important; transition: all 0.2s !important; margin-top: 8px !important;
+}
+.stDownloadButton > button:hover { background: #e4dff0 !important; transform: translateY(-1px) !important; }
+</style>
+"""
+
+st.markdown(css, unsafe_allow_html=True)
+st.markdown(button_css, unsafe_allow_html=True)
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ZIP_PATH = os.path.join(BASE_DIR, "My_Classmates_small.zip")
 EXTRACT_PATH = os.path.join(BASE_DIR, "My_Classmates")
+if not os.path.exists(EXTRACT_PATH):
+    with zipfile.ZipFile(ZIP_PATH, 'r') as zip_ref:
+        zip_ref.extractall(EXTRACT_PATH)
+
 REFERENCE_DIR = os.path.join(EXTRACT_PATH, "content", "My_Classmates_small")
 ROSTER_FILE = os.path.join(BASE_DIR, "student_roster.json")
 
-# --- Utilities: roster, persistence ---
 def load_roster():
     if os.path.exists(ROSTER_FILE):
         with open(ROSTER_FILE, "r") as f:
@@ -88,16 +260,12 @@ def export_to_excel(present, missing, date_str):
         df.to_excel(writer, index=False, sheet_name="Attendance")
     return output.getvalue()
 
-# --- Ensure reference dataset extracted ---
-if not os.path.exists(EXTRACT_PATH) and os.path.exists(ZIP_PATH):
-    with zipfile.ZipFile(ZIP_PATH, 'r') as zip_ref:
-        zip_ref.extractall(EXTRACT_PATH)
-
 if "student_roster" not in st.session_state:
     st.session_state.student_roster = load_roster()
+
 STUDENT_ROSTER = st.session_state.student_roster
 
-# --- Siamese model loader (optional) ---
+
 def load_siamese_model():
     try:
         import tensorflow as tf
@@ -107,13 +275,18 @@ def load_siamese_model():
         IMG_SHAPE = (128, 128, 3)
 
         def build_pro_embedding():
-            base_model = MobileNetV2(input_shape=IMG_SHAPE, include_top=False, weights='imagenet')
+            base_model = MobileNetV2(
+                input_shape=IMG_SHAPE,
+                include_top=False,
+                weights='imagenet'
+            )
+
             base_model.trainable = True
             for layer in base_model.layers[:-50]:
                 layer.trainable = False
 
             model = models.Sequential([
-                layers.Lambda(mobilenet_v2.preprocess_input),
+                layers.Lambda(mobilenet_v2.preprocess_input),   # ❗ חובה
                 base_model,
                 layers.GlobalAveragePooling2D(),
                 layers.Dense(512, activation='relu'),
@@ -123,25 +296,26 @@ def load_siamese_model():
                 layers.Dense(128, activation=None),
                 layers.Lambda(lambda x: tf.math.l2_normalize(x, axis=1), name="l2_norm")
             ], name="MobileNetV2_Embedding")
+
             return model
 
         embedding_model = build_pro_embedding()
+
         dummy = tf.zeros((1, 128, 128, 3))
         _ = embedding_model(dummy)
+
         embedding_model.load_weights(SIAMESE_WEIGHTS_PATH)
+
         return embedding_model
+
     except Exception as e:
-        print("Could not load Siamese model:", repr(e))
+        st.error(f"Could not load Siamese model: {e}")
         return None
 
-siamese_model = load_siamese_model()
 
-# --- Embeddings caches (lazy) ---
 @st.cache_resource
 def load_reference_embeddings():
     embeddings = {}
-    if DeepFace is None or not os.path.exists(REFERENCE_DIR):
-        return embeddings
     for student in os.listdir(REFERENCE_DIR):
         student_path = os.path.join(REFERENCE_DIR, student)
         if os.path.isdir(student_path):
@@ -150,11 +324,16 @@ def load_reference_embeddings():
                 if file.lower().endswith((".jpg",".jpeg",".png",".jfif")):
                     img_path = os.path.join(student_path, file)
                     try:
-                        result = DeepFace.represent(img_path=img_path, model_name="Facenet512", detector_backend="retinaface", enforce_detection=False)
+                        result = DeepFace.represent(
+                            img_path=img_path,
+                            model_name="Facenet512",
+                            detector_backend="retinaface",
+                            enforce_detection=False
+                        )
                         emb = np.array(result[0]["embedding"])
                         emb = emb / np.linalg.norm(emb)
                         student_embeddings.append(emb)
-                    except Exception:
+                    except:
                         pass
             if student_embeddings:
                 embeddings[student] = student_embeddings
@@ -162,187 +341,417 @@ def load_reference_embeddings():
 
 @st.cache_resource
 def load_siamese_embeddings(_siamese_model):
-    embeddings = {}
-    if _siamese_model is None or not os.path.exists(REFERENCE_DIR):
-        return embeddings
+    """בונה embeddings של כל התלמידים עם הרשת הסיאמית"""
     from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+
+    if _siamese_model is None:
+        return {}
+
+    embeddings = {}
+
     for student in os.listdir(REFERENCE_DIR):
         student_path = os.path.join(REFERENCE_DIR, student)
         if os.path.isdir(student_path):
             student_embeddings = []
+
             for file in os.listdir(student_path):
                 if file.lower().endswith((".jpg",".jpeg",".png",".jfif")):
                     img_path = os.path.join(student_path, file)
+
                     try:
                         img = Image.open(img_path).convert("RGB").resize((128, 128))
                         img_arr = np.array(img, dtype=np.float32)
-                        img_arr = preprocess_input(img_arr)
+                        img_arr = preprocess_input(img_arr)   # ❗ חובה
                         img_arr = np.expand_dims(img_arr, axis=0)
+
                         emb = _siamese_model.predict(img_arr, verbose=0)[0]
                         student_embeddings.append(emb)
+
                     except Exception as e:
                         print("Error embedding:", e)
+
             if student_embeddings:
                 embeddings[student] = student_embeddings
+
     return embeddings
+
 
 @st.cache_resource
 def load_reference_photos():
     photos = {}
-    if not os.path.exists(REFERENCE_DIR):
-        return photos
     for student in STUDENT_ROSTER:
         student_path = os.path.join(REFERENCE_DIR, student)
         if os.path.isdir(student_path):
-            files = [f for f in os.listdir(student_path) if f.lower().endswith((".jpg",".jpeg",".png",".jfif"))]
+            files = [f for f in os.listdir(student_path)
+                     if f.lower().endswith((".jpg",".jpeg",".png",".jfif"))]
             if files:
                 img_path = os.path.join(student_path, files[0])
                 photos[student] = Image.open(img_path).convert("RGB")
     return photos
 
+siamese_model = load_siamese_model()
 reference_embeddings = load_reference_embeddings()
 siamese_embeddings = load_siamese_embeddings(siamese_model)
 reference_photos = load_reference_photos()
 
-# --- Math helpers ---
+st.markdown("""
+<div class="main-header">
+    <div class="header-icon">
+        <span class="material-symbols-outlined">face_unlock</span>
+    </div>
+    <div>
+        <div class="header-title">Smart Attendance</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+with st.sidebar:
+    st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">group</span> Class roster</div>', unsafe_allow_html=True)
+    for s in STUDENT_ROSTER:
+        count = st.session_state.absence_counter.get(s, 0)
+        if count >= ABSENCE_THRESHOLD:
+            badge = f'<span style="margin-left:auto;background:#c4605a;color:white;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;">!{count}</span>'
+        elif count > 0:
+            badge = f'<span style="margin-left:auto;color:#b09080;font-size:11px;">{count}x</span>'
+        else:
+            badge = ''
+        st.markdown(f'<div class="sidebar-student"><span class="material-symbols-outlined">person</span>{s}{badge}</div>', unsafe_allow_html=True)
+
+    if st.session_state.last_results is not None:
+        results = st.session_state.last_results
+        excel_data = export_to_excel(results["present"], results["missing"], results["date"])
+        st.download_button(
+            label="⬇ Export to Mashov",
+            data=excel_data,
+            file_name=f"attendance_{results['date'].replace(' ','_').replace(':','-')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="export_btn"
+        )
+    else:
+        st.markdown('<p style="color:#c0a898;font-size:12px;margin-top:8px;">Run a scan to enable export</p>', unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # ---- בחירת מודל ----
+    st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">model_training</span> Recognition Model</div>', unsafe_allow_html=True)
+
+    siamese_available = siamese_model is not None and len(siamese_embeddings) > 0
+    model_options = ["DeepFace Facenet512"]
+    if siamese_available:
+        model_options.append("My Siamese Network")
+
+    chosen_model = st.radio(
+        "Choose model",
+        model_options,
+        key="model_choice_radio",
+        help="Siamese = custom-trained on your classmates. Facenet512 = pretrained general model."
+    )
+    st.session_state.model_choice = chosen_model
+
+    if chosen_model == "My Siamese Network":
+        st.markdown('<div class="model-badge model-badge-siamese"><span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> Custom model loaded</div>', unsafe_allow_html=True)
+        st.markdown(f'<p style="color:#a098b8;font-size:11px;">Threshold: {SIAMESE_THRESHOLD} · Euclidean distance · 100% recall</p>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="model-badge model-badge-deepface"><span class="material-symbols-outlined" style="font-size:14px;">hub</span> Facenet512 active</div>', unsafe_allow_html=True)
+        st.markdown('<p style="color:#a098b8;font-size:11px;">Pretrained · Cosine distance · 512-dim</p>', unsafe_allow_html=True)
+
+    if not siamese_available:
+        st.markdown('<p style="color:#d4707a;font-size:11px;">⚠ Siamese weights not found</p>', unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">manage_accounts</span> Manage Students</div>', unsafe_allow_html=True)
+
+    with st.expander("Remove student"):
+        if STUDENT_ROSTER:
+            student_to_remove = st.selectbox("Select student", STUDENT_ROSTER, key="remove_select")
+            if st.button("Remove", key="remove_btn"):
+                st.session_state.student_roster.remove(student_to_remove)
+                save_roster(st.session_state.student_roster)
+                student_path = os.path.join(REFERENCE_DIR, student_to_remove)
+                if os.path.exists(student_path):
+                    import shutil
+                    shutil.rmtree(student_path)
+                st.success(f"{student_to_remove} removed!")
+                st.rerun()
+
+    with st.expander("Add new student"):
+        new_name = st.text_input("Student name", placeholder="e.g. Noa", key="new_name")
+        photo_method = st.radio("Photo method", ["📷 Camera", "📤 Upload"], key="photo_method", horizontal=True)
+        if new_name:
+            photos_collected = []
+            if photo_method == "📷 Camera":
+                st.markdown(f'<p style="color:#b09080;font-size:12px;">Collected: <b style="color:#c99566;">{len(st.session_state.collected_photos)}/10</b></p>', unsafe_allow_html=True)
+                if len(st.session_state.collected_photos) > 0:
+                    pct = len(st.session_state.collected_photos) * 10
+                    st.markdown(f'<div class="progress-container"><div class="progress-bar" style="width:{pct}%"></div></div>', unsafe_allow_html=True)
+                cam_img = st.camera_input("", key=f"cam_{len(st.session_state.collected_photos)}")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if cam_img and st.button("Add photo", key="add_photo"):
+                        st.session_state.collected_photos.append(cam_img)
+                        st.rerun()
+                with col2:
+                    if st.button("Clear all", key="clear_photos"):
+                        st.session_state.collected_photos = []
+                        st.rerun()
+                photos_collected = st.session_state.collected_photos
+            else:
+                uploaded_files = st.file_uploader("Upload photos", type=["jpg","jpeg","png"], accept_multiple_files=True, key="upload_photos")
+                if uploaded_files:
+                    pct = min(len(uploaded_files) * 10, 100)
+                    st.markdown(f'<div class="progress-container"><div class="progress-bar" style="width:{pct}%"></div></div>', unsafe_allow_html=True)
+                    st.markdown(f'<p style="color:#{"7a9e6a" if len(uploaded_files)>=5 else "c99566"};font-size:12px;">{len(uploaded_files)}/10 photos</p>', unsafe_allow_html=True)
+                photos_collected = uploaded_files or []
+
+            can_save = len(photos_collected) >= 5
+            if st.button(
+                "Save student" if can_save else f"Need {max(0, 5-len(photos_collected))} more",
+                key="save_student", disabled=not can_save
+            ):
+                student_dir = os.path.join(REFERENCE_DIR, new_name)
+                os.makedirs(student_dir, exist_ok=True)
+                for idx, photo in enumerate(photos_collected):
+                    img = Image.open(photo).convert("RGB")
+                    img.save(os.path.join(student_dir, f"{new_name}_{idx+1}.jpg"))
+                if new_name not in st.session_state.student_roster:
+                    st.session_state.student_roster.append(new_name)
+                    save_roster(st.session_state.student_roster)
+                st.session_state.collected_photos = []
+                with st.spinner(f"Processing {new_name}'s photos..."):
+                    new_embs_deepface = []
+                    new_embs_siamese = []
+                    for idx in range(len(photos_collected)):
+                        img_path = os.path.join(student_dir, f"{new_name}_{idx+1}.jpg")
+                        # Facenet
+                        try:
+                            result = DeepFace.represent(img_path=img_path, model_name="Facenet512", detector_backend="retinaface", enforce_detection=False)
+                            emb = np.array(result[0]["embedding"])
+                            emb = emb / np.linalg.norm(emb)
+                            new_embs_deepface.append(emb)
+                        except:
+                            pass
+                        # Siamese
+                        if siamese_model is not None:
+                            try:
+                                img = Image.open(img_path).convert("RGB").resize((128, 128))
+                                img_arr = np.array(img, dtype=np.float32) / 255.0
+                                img_arr = np.expand_dims(img_arr, axis=0)
+                                emb = siamese_model.predict(img_arr, verbose=0)[0]
+                                new_embs_siamese.append(emb)
+                            except:
+                                pass
+                    if new_embs_deepface:
+                        reference_embeddings[new_name] = new_embs_deepface
+                    if new_embs_siamese:
+                        siamese_embeddings[new_name] = new_embs_siamese
+                st.success(f"✓ {new_name} added!")
+                st.rerun()
+
+    st.markdown("---")
+    st.markdown('<div class="sidebar-title"><span class="material-symbols-outlined">tune</span> Settings</div>', unsafe_allow_html=True)
+    threshold = st.slider("Detection threshold", 0.0, 1.0, 0.4)
+    confidence = st.slider("Face confidence", 0.5, 1.0, 0.7)
+
+# ---- Mode tabs ----
+tab_cols = st.columns(3)
+tab_data = [("upload", "Upload Photo"), ("random", "Random Class"), ("camera", "Live Camera")]
+for idx, (mode_key, label) in enumerate(tab_data):
+    with tab_cols[idx]:
+        is_active = st.session_state.mode == mode_key
+        if st.button(label, key=f"tab_{mode_key}", type="primary" if is_active else "secondary"):
+            st.session_state.mode = mode_key
+            st.rerun()
+
+def paste_face_safely(bg_pil, face_img, cell_x, cell_y, cell_w, cell_h):
+    """
+    מדביקה פנים על רקע בצורה נקייה:
+    - מסירה רקע
+    - שומרת על יחס גובה-רוחב
+    - מתאימה לגודל התא בלי עיוות
+    - ממקמת במרכז התא
+    """
+
+    # 1. הסרת רקע
+    face_no_bg = remove(face_img)
+
+    # 2. שמירה על יחס גובה–רוחב
+    orig_w, orig_h = face_no_bg.size
+    ratio = min(cell_w / orig_w, cell_h / orig_h)
+    new_w = int(orig_w * ratio)
+    new_h = int(orig_h * ratio)
+
+    face_resized = face_no_bg.resize((new_w, new_h), Image.LANCZOS)
+
+    # 3. מיקום במרכז התא
+    paste_x = cell_x + (cell_w - new_w) // 2
+    paste_y = cell_y + (cell_h - new_h) // 2
+
+    # 4. הדבקה
+    bg_pil.paste(face_resized, (paste_x, paste_y), face_resized)
+
+    return bg_pil
+def rotate_face_by_eyes(img_pil):
+    """
+    מסובבת תמונה כך שהעיניים יהיו בקו אופקי.
+    הכי יציב, הכי מדויק, בלי עיוותים.
+    """
+
+    import numpy as np
+    from deepface import DeepFace
+    import math
+
+    img_np = np.array(img_pil)
+
+    try:
+        faces = DeepFace.extract_faces(
+            img_path=img_np,
+            detector_backend="retinaface",
+            enforce_detection=False
+        )
+
+        if len(faces) == 0:
+            return img_pil
+
+        face = faces[0]
+        landmarks = face.get("landmarks", {})
+
+        if "left_eye" not in landmarks or "right_eye" not in landmarks:
+            return img_pil
+
+        left = landmarks["left_eye"]
+        right = landmarks["right_eye"]
+
+        dx = right[0] - left[0]
+        dy = right[1] - left[1]
+
+        angle = math.degrees(math.atan2(dy, dx))
+
+        # סיבוב הפוך כדי ליישר
+        return img_pil.rotate(-angle, expand=True)
+
+    except:
+        return img_pil
+
+
+def generate_class_image():
+    background_options = [
+        os.path.join(BASE_DIR, "הורדה.jfif"),
+        os.path.join(BASE_DIR, "images (1).jfif"),
+        os.path.join(BASE_DIR, "images.jfif"),
+        os.path.join(BASE_DIR, "images (2).jfif"),
+    ]
+
+    # בחירת רקע תקין
+    available_backgrounds = [b for b in background_options if os.path.exists(b)]
+    if not available_backgrounds:
+        st.error("No background images found")
+        st.stop()
+
+    bg = cv2.imread(random.choice(available_backgrounds))
+    if bg is None:
+        st.error("Could not load background")
+        st.stop()
+
+    # גודל תמונה כיתתית
+    bg = cv2.resize(bg, (900, 600), interpolation=cv2.INTER_CUBIC)
+
+    # רשימת תלמידים
+    students = os.listdir(REFERENCE_DIR)
+    present = random.sample(students, random.randint(0, len(students)))
+
+    # חלוקה ל־2 שורות × 5 עמודות
+    rows, cols = 2, 5
+    cell_w = bg.shape[1] // cols
+    cell_h = bg.shape[0] // rows
+
+    # מיקומים אפשריים
+    positions = [(c * cell_w, r * cell_h) for r in range(rows) for c in range(cols)]
+    random.shuffle(positions)
+
+    # המרה ל־PIL
+    bg_pil = Image.fromarray(cv2.cvtColor(bg, cv2.COLOR_BGR2RGB)).convert("RGBA")
+
+    i = 0
+    for name in present:
+        if i < len(positions):
+            student_dir = os.path.join(REFERENCE_DIR, name)
+            imgs = os.listdir(student_dir)
+
+            if imgs:
+                face = cv2.imread(os.path.join(student_dir, random.choice(imgs)))
+                if face is not None:
+
+                    # המרת התמונה ל-PIL
+                    face_pil = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
+
+                    # ⭐ יישור פנים לפי העיניים (הכי מדויק)
+                    face_pil = rotate_face_by_eyes(face_pil)
+
+                    # מיקום בתא
+                    x, y = positions[i]
+
+                    # ⭐ הדבקה בטוחה ללא עיוות
+                    bg_pil = paste_face_safely(bg_pil, face_pil, x, y, cell_w, cell_h)
+
+                    i += 1
+
+    return np.array(bg_pil.convert("RGB")), present
+
+
+def extract_faces(image, confidence_threshold=0.7):
+    img_rgb = np.array(image.convert("RGB"))
+    faces = []
+    try:
+        face_objs = DeepFace.extract_faces(
+            img_path=img_rgb,
+            detector_backend="retinaface",
+            enforce_detection=False,
+            align=True
+        )
+        for face_obj in face_objs:
+            if face_obj["confidence"] < confidence_threshold:
+                continue
+            region = face_obj["facial_area"]
+            x, y, w, h = region["x"], region["y"], region["w"], region["h"]
+            pad_x = int(0.2 * w)
+            pad_y = int(0.2 * h)
+            x1 = max(0, x - pad_x)
+            y1 = max(0, y - pad_y)
+            x2 = min(img_rgb.shape[1], x + w + pad_x)
+            y2 = min(img_rgb.shape[0], y + h + pad_y)
+            face = img_rgb[y1:y2, x1:x2]
+            if face.size == 0:
+                continue
+            face_img = Image.fromarray(face).resize((160, 160))
+            faces.append({"face": face_img, "box": (x1, y1, x2-x1, y2-y1)})
+    except Exception as e:
+        st.warning(f"Face detection error: {e}")
+    return faces, img_rgb
+
 def cosine_distance(a, b):
     return 1 - np.dot(a, b)
 
 def euclidean_distance(a, b):
     return float(np.linalg.norm(a - b))
 
-# --- Embedding helper for siamese ---
-def get_embedding_siamese(pil_img):
-    if siamese_model is None:
-        raise RuntimeError("Siamese model not loaded")
-    from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
-    img = pil_img.convert("RGB").resize((128, 128))
-    arr = np.array(img, dtype=np.float32)
-    arr = preprocess_input(arr)
-    arr = np.expand_dims(arr, axis=0)
-    emb = siamese_model.predict(arr, verbose=0)[0]
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+
+def get_embedding_siamese(face_img):
+    img = face_img.convert("RGB").resize((128, 128))
+    img_arr = np.array(img, dtype=np.float32)
+    img_arr = preprocess_input(img_arr)   # ❗ חובה
+    img_arr = np.expand_dims(img_arr, axis=0)
+    emb = siamese_model.predict(img_arr, verbose=0)[0]
     return emb
 
-# --- Robust extract_faces with debug and fallbacks ---
-def extract_faces(image_pil, confidence_threshold=0.7, debug=False):
-    """
-    Returns (faces, original_img_rgb)
-    faces: list of dict { "face": PIL.Image, "box": [x,y,w,h], "confidence": float }
-    """
-    original_img_rgb = np.array(image_pil.convert("RGB"))
-    faces = []
 
-    if DeepFace is None:
-        if debug:
-            print("extract_faces: DeepFace not available")
-        return faces, original_img_rgb
-
-    # Upscale small images to help detectors
-    h, w = original_img_rgb.shape[:2]
-    scale_img = image_pil
-    if max(h, w) < 800:
-        try:
-            scale = 800 / max(h, w)
-            new_w = int(w * scale)
-            new_h = int(h * scale)
-            scale_img = image_pil.resize((new_w, new_h), Image.LANCZOS)
-            if debug:
-                print(f"extract_faces: upscaled image {(w,h)} -> {(new_w,new_h)}")
-        except Exception as e:
-            if debug:
-                print("extract_faces: upscale failed", repr(e))
-
-    backends = ["retinaface", "mtcnn", "opencv"]
-    detections = []
-    last_exc = None
-
-    for backend in backends:
-        try:
-            if debug:
-                print("extract_faces: trying backend", backend)
-            detections = DeepFace.extract_faces(img_path=scale_img, detector_backend=backend, enforce_detection=False)
-            if debug:
-                print(f"extract_faces: backend {backend} returned {len(detections)} detections")
-                if len(detections) > 0:
-                    print("sample detection keys:", list(detections[0].keys()))
-            if detections:
-                break
-        except Exception as e:
-            last_exc = e
-            if debug:
-                print(f"extract_faces: backend {backend} exception:", repr(e))
-            detections = []
-
-    if not detections:
-        if debug:
-            print("extract_faces: no detections from any backend", repr(last_exc))
-        return faces, original_img_rgb
-
-    for idx, det in enumerate(detections):
-        try:
-            if debug:
-                print(f"det[{idx}] keys:", list(det.keys()))
-            conf = det.get("confidence", 0) or 0.0
-            if conf < confidence_threshold:
-                if debug:
-                    print(f"det[{idx}] low confidence {conf}, skipping")
-                continue
-
-            face_crop = det.get("face", None)
-            if face_crop is None:
-                fa = det.get("facial_area", {}) or det.get("region", {}) or det.get("box", {})
-                if isinstance(fa, dict) and all(k in fa for k in ("x","y","w","h")):
-                    x = int(fa["x"]); y = int(fa["y"]); w_box = int(fa["w"]); h_box = int(fa["h"])
-                    face_crop = original_img_rgb[y:y+h_box, x:x+w_box]
-                elif isinstance(fa, dict) and all(k in fa for k in ("left","top","right","bottom")):
-                    x = int(fa["left"]); y = int(fa["top"]); w_box = int(fa["right"]) - x; h_box = int(fa["bottom"]) - y
-                    face_crop = original_img_rgb[y:y+h_box, x:x+w_box]
-                else:
-                    if debug:
-                        print(f"det[{idx}] no face crop and cannot manual crop, skipping")
-                    continue
-
-            if isinstance(face_crop, np.ndarray):
-                face_pil = Image.fromarray(face_crop)
-            elif isinstance(face_crop, Image.Image):
-                face_pil = face_crop
-            else:
-                try:
-                    face_pil = Image.fromarray(np.array(face_crop))
-                except Exception:
-                    if debug:
-                        print(f"det[{idx}] unknown face crop type, skipping")
-                    continue
-
-            fa = det.get("facial_area", {}) or det.get("region", {}) or det.get("box", {})
-            if isinstance(fa, dict):
-                if "x" in fa and "y" in fa and "w" in fa and "h" in fa:
-                    box = [int(fa.get("x",0)), int(fa.get("y",0)), int(fa.get("w",0)), int(fa.get("h",0))]
-                elif "left" in fa and "top" in fa and "right" in fa and "bottom" in fa:
-                    x = int(fa.get("left",0)); y = int(fa.get("top",0))
-                    box = [x, y, int(fa.get("right",0)) - x, int(fa.get("bottom",0)) - y]
-                else:
-                    box = [0,0,original_img_rgb.shape[1], original_img_rgb.shape[0]]
-            elif isinstance(fa, (list, tuple)) and len(fa) >= 4:
-                box = [int(fa[0]), int(fa[1]), int(fa[2]), int(fa[3])]
-            else:
-                box = [0,0,original_img_rgb.shape[1], original_img_rgb.shape[0]]
-
-            faces.append({"face": face_pil, "box": box, "confidence": float(conf)})
-            if debug:
-                print(f"extract_faces: appended face idx={idx} box={box} conf={conf}")
-
-        except Exception as e:
-            if debug:
-                print(f"extract_faces: per-detection error idx={idx}:", repr(e))
-            continue
-
-    return faces, original_img_rgb
-
-# --- Recognition function ---
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
-    use_siamese = (st.session_state.model_choice == "My Siamese Network" and siamese_model is not None)
+    use_siamese = (
+        st.session_state.model_choice == "My Siamese Network"
+        and siamese_model is not None
+    )
 
+    # --- UI: סריקה ---
     scan_placeholder = st.empty()
     scan_placeholder.markdown("""
     <div class="scan-container">
@@ -355,19 +764,27 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     """, unsafe_allow_html=True)
 
     progress = st.progress(0, text="Detecting faces...")
-    faces, original_img_rgb = extract_faces(image_pil, confidence_threshold, debug=False)
+    faces, original_img_rgb = extract_faces(image_pil, confidence_threshold)
     progress.progress(30, text="Analyzing faces...")
     scan_placeholder.empty()
 
+    # --- בחירת מודל ---
     if use_siamese:
-        st.markdown('<div class="model-badge model-badge-siamese"><span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> Using: My Siamese Network</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="model-badge model-badge-siamese"><span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> Using: My Siamese Network</div>',
+            unsafe_allow_html=True,
+        )
         active_embeddings = siamese_embeddings
         active_threshold = SIAMESE_THRESHOLD
     else:
-        st.markdown('<div class="model-badge model-badge-deepface"><span class="material-symbols-outlined" style="font-size:14px;">hub</span> Using: DeepFace Facenet512</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="model-badge model-badge-deepface"><span class="material-symbols-outlined" style="font-size:14px;">hub</span> Using: DeepFace Facenet512</div>',
+            unsafe_allow_html=True,
+        )
         active_embeddings = reference_embeddings
         active_threshold = threshold
 
+    # --- לולאת השוואה חדשה ---
     present_students = {}
     recognized_faces = []
     total = max(len(faces), 1)
@@ -375,58 +792,94 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     for i, data in enumerate(faces):
         img = data["face"]
         box = data["box"]
-        progress.progress(30 + int(60 * i / total), text=f"Identifying face {i+1} of {len(faces)}...")
+        progress.progress(
+            30 + int(60 * i / total),
+            text=f"Identifying face {i+1} of {len(faces)}...",
+        )
 
+        # --- הפקת embedding ---
         try:
             if use_siamese:
                 emb = get_embedding_siamese(img)
             else:
-                result = DeepFace.represent(img_path=np.array(img), model_name="Facenet512", detector_backend="skip", enforce_detection=False)
+                result = DeepFace.represent(
+                    img_path=np.array(img),
+                    model_name="Facenet512",
+                    detector_backend="skip",
+                    enforce_detection=False,
+                )
                 emb = np.array(result[0]["embedding"])
                 emb = emb / np.linalg.norm(emb)
         except Exception as e:
             st.write(f"❌ Failed to extract embedding: {e}")
             continue
 
+        # --- אם אין אמבדינגים להשוואה ---
         if not active_embeddings:
             st.write("⚠ No reference embeddings loaded!")
             continue
 
+        # --- חישוב מרחקים ---
         distances = {}
         for name, ref_embs in active_embeddings.items():
             if use_siamese:
                 d = min(euclidean_distance(emb, r) for r in ref_embs)
             else:
                 d = min(cosine_distance(emb, r) for r in ref_embs)
+
             distances[name] = d
+            st.write(f"🔍 Comparing to {name}: distance = {d}")
 
+        # --- בחירת ההתאמה הטובה ביותר ---
         best_name, best_dist = min(distances.items(), key=lambda x: x[1])
+        st.write(f"➡ Best match: {best_name} (dist={best_dist}, threshold={active_threshold})")
 
+        # --- החלטה אם זה ידוע או לא ---
         if best_dist <= active_threshold:
             if best_name not in present_students:
                 present_students[best_name] = {"img": img, "unknown": False}
-                recognized_faces.append({"name": best_name, "box": box, "dist": best_dist, "unknown": False})
+                recognized_faces.append(
+                    {
+                        "name": best_name,
+                        "box": box,
+                        "dist": best_dist,
+                        "unknown": False,
+                    }
+                )
         else:
             unknown_key = f"Unknown_{i}"
             present_students[unknown_key] = {"img": img, "unknown": True}
-            recognized_faces.append({"name": "Unknown", "box": box, "dist": best_dist, "unknown": True})
+            recognized_faces.append(
+                {
+                    "name": "Unknown",
+                    "box": box,
+                    "dist": best_dist,
+                    "unknown": True,
+                }
+            )
 
+    # --- המשך הפונקציה (ציור, סטטיסטיקות וכו') ---
     progress.progress(100, text="Done!")
     progress.empty()
+
+    # כל שאר הקוד שלך נשאר בדיוק אותו דבר
+    # (ציור תיבות, חישוב נוכחות, UI וכו')
+
 
     st.markdown(f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;">{len(faces)} faces detected</p>', unsafe_allow_html=True)
 
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
     font_name = font_conf = None
-    for path in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]:
+    for path in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                 "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]:
         if os.path.exists(path):
             font_name = ImageFont.truetype(path, 32)
             font_conf = ImageFont.truetype(path, 20)
             break
     if not font_name:
-        font_name = ImageFont.load_default()
-        font_conf = ImageFont.load_default()
+        font_name = ImageFont.load_default(size=32)
+        font_conf = ImageFont.load_default(size=20)
 
     for face in recognized_faces:
         x, y, w, h = face["box"]
@@ -447,17 +900,18 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     updated_absences = update_absences(missing)
-    st.session_state.last_results = {"present": list(known_present.keys()), "missing": missing, "date": date_str}
-
-    all_students = [d for d in os.listdir(REFERENCE_DIR) if os.path.isdir(os.path.join(REFERENCE_DIR, d))] if os.path.exists(REFERENCE_DIR) else []
-    if len(known_present) == len(all_students) and len(all_students) > 0:
+    st.session_state.last_results = {
+        "present": present,
+        "missing": missing,
+        "date": date_str
+    }
+    
+    # ⭐ סאונד שמח כשכולם נמצאים
+    all_students = os.listdir(REFERENCE_DIR)
+    if len(present) == len(all_students):
         st.success("🎉 Everyone is here!")
-        try:
-            st.audio("3.mp3", autoplay=True)
-        except Exception:
-            pass
+        st.audio("3.mp3", autoplay=True)
 
-    # Summary cards
     st.markdown(f"""
     <div class="stat-row">
         <div class="stat-card">
@@ -495,7 +949,8 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         </div>
         """, unsafe_allow_html=True)
 
-    if any(v["unknown"] for v in present_students.values()):
+    has_unknown = any(v["unknown"] for v in present_students.values())
+    if has_unknown:
         st.markdown("""
         <div style="background:#ff8c0015;border:1.5px solid #ff8c0050;border-radius:12px;
             padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
@@ -507,17 +962,18 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         </div>
         """, unsafe_allow_html=True)
 
-    # Present / absent lists
     st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span>Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
     if present_students:
         cols = st.columns(5)
         for i, (name, data) in enumerate(present_students.items()):
             with cols[i % 5]:
-                st.markdown('<div class="student-card">', unsafe_allow_html=True)
-                st.image(data["img"], width=100)
                 if data["unknown"]:
+                    st.markdown('<div class="student-card">', unsafe_allow_html=True)
+                    st.image(data["img"], width=100)
                     st.markdown('<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div><div style="text-align:center;color:#b07040;font-size:11px;">Not in roster</div></div>', unsafe_allow_html=True)
                 else:
+                    st.markdown('<div class="student-card">', unsafe_allow_html=True)
+                    st.image(data["img"], width=100)
                     st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;">{name}</div></div>', unsafe_allow_html=True)
 
     st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span>Absent</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
@@ -535,45 +991,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     else:
         st.success("Everyone's here today!")
 
-# --- UI and sidebar (minimal) ---
-st.title("Smart Attendance")
-
-with st.sidebar:
-    st.header("Class roster")
-    for s in STUDENT_ROSTER:
-        count = st.session_state.absence_counter.get(s, 0)
-        st.write(f"{s} — {count}x" if count else s)
-
-    if st.session_state.last_results is not None:
-        results = st.session_state.last_results
-        excel_data = export_to_excel(results["present"], results["missing"], results["date"])
-        st.download_button(label="⬇ Export to Mashov", data=excel_data, file_name=f"attendance_{results['date'].replace(' ','_').replace(':','-')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-    st.markdown("---")
-    st.header("Recognition Model")
-    siamese_available = siamese_model is not None and len(siamese_embeddings) > 0
-    model_options = ["DeepFace Facenet512"]
-    if siamese_available:
-        model_options.append("My Siamese Network")
-    chosen_model = st.radio("Choose model", model_options, key="model_choice_radio")
-    st.session_state.model_choice = chosen_model
-
-    st.markdown("---")
-    st.header("Settings")
-    threshold = st.slider("Detection threshold", 0.0, 1.0, 0.4)
-    confidence = st.slider("Face confidence", 0.3, 1.0, 0.6)
-
-# --- Mode tabs ---
-tab_cols = st.columns(3)
-tab_data = [("upload", "Upload Photo"), ("random", "Random Class"), ("camera", "Live Camera")]
-for idx, (mode_key, label) in enumerate(tab_data):
-    with tab_cols[idx]:
-        is_active = st.session_state.mode == mode_key
-        if st.button(label, key=f"tab_{mode_key}", type="primary" if is_active else "secondary"):
-            st.session_state.mode = mode_key
-            st.experimental_rerun()
-
-# --- Mode content ---
+# ---- Mode content ----
 if st.session_state.mode == "upload":
     st.markdown("""
     <div class="upload-zone">
@@ -588,30 +1006,20 @@ if st.session_state.mode == "upload":
         class_image = ImageOps.exif_transpose(class_image)
         if max(class_image.size) > 1200:
             class_image.thumbnail((1200, 1200))
-
-        # Debug run (temporary) — set debug=False in production
-        faces, img = extract_faces(class_image, confidence_threshold=confidence, debug=True)
-        st.write(f"DEBUG: extract_faces returned {len(faces)} faces")
-        for i, f in enumerate(faces):
-            st.write(f"face[{i}] box={f['box']} conf={f['confidence']} type={type(f['face'])}")
-
         if st.button("Scan for Attendance", key="scan_upload", type="primary"):
-            recognize_faces(class_image, confidence_threshold=confidence, threshold=threshold)
+            recognize_faces(class_image, confidence, threshold)
 
 elif st.session_state.mode == "random":
     st.markdown('<p class="mode-desc">Generate a random class photo with students on a classroom background.</p>', unsafe_allow_html=True)
     if st.button("Generate Class Photo", key="gen_btn", type="primary"):
         with st.spinner("Generating class photo..."):
-            try:
-                result_img, present = generate_class_image()
-                pil_image = Image.fromarray(result_img)
-                st.image(pil_image, use_column_width=True)
-                present_str = ", ".join(present) if present else "Nobody"
-                st.markdown(f'<p style="color:#b09080;font-size:13px;margin:8px 0;">Actually present: <span style="color:#c99566;font-weight:600;">{present_str}</span></p>', unsafe_allow_html=True)
-                st.markdown("---")
-                recognize_faces(pil_image, confidence_threshold=confidence, threshold=threshold)
-            except Exception as e:
-                st.error(f"Generate failed: {e}")
+            result_img, present = generate_class_image()
+        pil_image = Image.fromarray(result_img)
+        st.image(pil_image, use_column_width=True)
+        present_str = ", ".join(present) if present else "Nobody"
+        st.markdown(f'<p style="color:#b09080;font-size:13px;margin:8px 0;">Actually present: <span style="color:#c99566;font-weight:600;">{present_str}</span></p>', unsafe_allow_html=True)
+        st.markdown("---")
+        recognize_faces(pil_image, confidence, threshold)
 
 elif st.session_state.mode == "camera":
     st.markdown('<p class="mode-desc">Take a photo directly from your camera.</p>', unsafe_allow_html=True)
@@ -621,5 +1029,4 @@ elif st.session_state.mode == "camera":
         if max(class_image.size) > 1200:
             class_image.thumbnail((1200, 1200))
         if st.button("Scan for Attendance", key="scan_camera", type="primary"):
-            recognize_faces(class_image, confidence_threshold=confidence, threshold=threshold)
-```
+            recognize_faces(class_image, confidence, threshold)
