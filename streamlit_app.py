@@ -904,7 +904,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     "present": list(known_present.keys()),   
     "missing": missing,
     "date": date_str
-}
+    }
     
     # ⭐ סאונד שמח כשכולם נמצאים
     all_students = os.listdir(REFERENCE_DIR)
