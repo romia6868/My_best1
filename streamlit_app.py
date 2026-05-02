@@ -756,7 +756,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     st.write(f"siamese_embeddings count: {len(siamese_embeddings)}")
     st.write(f"reference_embeddings count: {len(reference_embeddings)}")
     st.write(f"use_siamese: {use_siamese}")
-    st.write(f"active_embeddings count: {len(active_embeddings)}")
+   
 
     # --- UI: סריקה ---
     scan_placeholder = st.empty()
