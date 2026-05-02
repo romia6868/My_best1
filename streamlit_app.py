@@ -908,10 +908,10 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     
     # ⭐ סאונד שמח כשכולם נמצאים
     all_students = os.listdir(REFERENCE_DIR)
-    if len(present) == len(all_students):
+    if len(known_present) == len(all_students):
         st.success("🎉 Everyone is here!")
         st.audio("3.mp3", autoplay=True)
-
+        
     st.markdown(f"""
     <div class="stat-row">
         <div class="stat-card">
