@@ -307,33 +307,32 @@ def load_siamese_model():
             for layer in base_model.layers[:-50]:
                 layer.trainable = False
 
-            model = models.Sequential([
-                base_model,
-                layers.GlobalAveragePooling2D(),
-                layers.Dense(512, activation='relu'),
-                layers.BatchNormalization(),
-                layers.Dropout(0.3),
-                layers.Dense(256, activation='relu'),
-                layers.Dense(128, activation=None),
-                layers.Lambda(lambda x: tf.math.l2_normalize(x, axis=1), name="l2_norm")
-            ], name="MobileNetV2_Embedding")
+            inputs = tf.keras.Input(shape=IMG_SHAPE)
+            x = base_model(inputs, training=False)
+            x = layers.GlobalAveragePooling2D()(x)
+            x = layers.Dense(512, activation='relu')(x)
+            x = layers.BatchNormalization()(x)
+            x = layers.Dropout(0.3)(x)
+            x = layers.Dense(256, activation='relu')(x)
+            x = layers.Dense(128, activation=None)(x)
+            x = layers.Lambda(
+                lambda v: tf.math.l2_normalize(v, axis=1),
+                name="l2_norm"
+            )(x)
 
-            return model
+            return models.Model(inputs, x, name="MobileNetV2_Embedding")
 
         embedding_model = build_pro_embedding()
-
-        dummy = tf.zeros((1, 128, 128, 3))
-        _ = embedding_model(dummy)
-
         embedding_model.load_weights(SIAMESE_WEIGHTS_PATH)
+        print("✅ Siamese model loaded successfully")
         return embedding_model
 
     except Exception as e:
-            st.error(f"Could not load Siamese model: {e}")
-            import traceback
-            st.code(traceback.format_exc())  # ← הוסיפי את השורה הזו
-            return None
-           
+        st.error(f"Could not load Siamese model: {e}")
+        import traceback
+        st.code(traceback.format_exc())
+        return None
+        
 @st.cache_resource
 def load_reference_embeddings():
     embeddings = {}
