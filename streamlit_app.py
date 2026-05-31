@@ -49,6 +49,8 @@ DeepFace = lazy_import_deepface()
 remove = lazy_import_rembg()
 
 
+
+
 # --- הגדרות Streamlit ---
 st.set_page_config(
     page_title="Smart Attendance",
@@ -286,12 +288,11 @@ if "student_roster" not in st.session_state:
 
 STUDENT_ROSTER = st.session_state.student_roster
 
-
 def load_siamese_model():
     try:
         import tensorflow as tf
         from tensorflow.keras import layers, models
-        from tensorflow.keras.applications import MobileNetV2, mobilenet_v2
+        from tensorflow.keras.applications import MobileNetV2
 
         IMG_SHAPE = (128, 128, 3)
 
@@ -307,7 +308,6 @@ def load_siamese_model():
                 layer.trainable = False
 
             model = models.Sequential([
-                layers.Lambda(mobilenet_v2.preprocess_input),   # ❗ חובה
                 base_model,
                 layers.GlobalAveragePooling2D(),
                 layers.Dense(512, activation='relu'),
@@ -326,13 +326,11 @@ def load_siamese_model():
         _ = embedding_model(dummy)
 
         embedding_model.load_weights(SIAMESE_WEIGHTS_PATH)
-
         return embedding_model
 
     except Exception as e:
         st.error(f"Could not load Siamese model: {e}")
         return None
-
 
 @st.cache_resource
 def load_reference_embeddings():
@@ -763,7 +761,7 @@ from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 def get_embedding_siamese(face_img):
     img = face_img.convert("RGB").resize((128, 128))
     img_arr = np.array(img, dtype=np.float32)
-    img_arr = preprocess_input(img_arr)   # ❗ חובה
+    img_arr = preprocess_input(img_arr)   # ← כאן, לא בתוך המודל
     img_arr = np.expand_dims(img_arr, axis=0)
     emb = siamese_model.predict(img_arr, verbose=0)[0]
     return emb
