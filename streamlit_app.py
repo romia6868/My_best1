@@ -1029,7 +1029,7 @@ if st.session_state.mode == "upload":
         <div class="upload-sub">JPG · PNG · JPEG</div>
     </div>
     """, unsafe_allow_html=True)
-    class_file = st.file_uploader("", type=["jpg","jpeg","png"], label_visibility="collapsed")
+    class_file = st.file_uploader("Upload class photo", type=["jpg","jpeg","png"], label_visibility="collapsed")
     if class_file is not None:
         class_image = Image.open(class_file)
         class_image = ImageOps.exif_transpose(class_image)
