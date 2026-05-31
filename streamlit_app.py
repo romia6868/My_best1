@@ -617,8 +617,11 @@ def rotate_face_by_eyes(img_pil):
     הכי יציב, הכי מדויק, בלי עיוותים.
     """
 
+    # אם DeepFace לא נטען → לא מסובבים
+    if DeepFace is None:
+        return img_pil
+
     import numpy as np
-    from deepface import DeepFace
     import math
 
     img_np = np.array(img_pil)
@@ -647,10 +650,10 @@ def rotate_face_by_eyes(img_pil):
 
         angle = math.degrees(math.atan2(dy, dx))
 
-        # סיבוב הפוך כדי ליישר
         return img_pil.rotate(-angle, expand=True)
 
-    except:
+    except Exception as e:
+        print("rotate_face_by_eyes ERROR:", e)
         return img_pil
 
 
