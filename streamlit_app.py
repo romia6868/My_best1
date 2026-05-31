@@ -291,15 +291,43 @@ STUDENT_ROSTER = st.session_state.student_roster
 def load_siamese_model():
     try:
         import tensorflow as tf
+        import h5py
 
         MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "my_siamese3_model.h5")
-        
-        if not os.path.exists(MODEL_PATH):
-            st.error(f"Model file not found: {MODEL_PATH}")
+        WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "my_siamese3_weights.weights.h5")
+
+        if not os.path.exists(WEIGHTS_PATH):
+            st.error(f"Weights file not found: {WEIGHTS_PATH}")
             return None
-            
-        embedding_model = tf.keras.models.load_model(MODEL_PATH, compile=False)
-        print("✅ Model loaded successfully")
+
+        from tensorflow.keras import layers, models
+        from tensorflow.keras.applications import MobileNetV2, mobilenet_v2
+
+        IMG_SHAPE = (128, 128, 3)
+
+        base_model = MobileNetV2(input_shape=IMG_SHAPE, include_top=False, weights='imagenet')
+        base_model.trainable = True
+        for layer in base_model.layers[:-50]:
+            layer.trainable = False
+
+        inputs = tf.keras.Input(shape=IMG_SHAPE)
+        x = layers.Lambda(mobilenet_v2.preprocess_input)(inputs)
+        x = base_model(x, training=False)
+        x = layers.GlobalAveragePooling2D()(x)
+        x = layers.Dense(512, activation='relu')(x)
+        x = layers.BatchNormalization()(x)
+        x = layers.Dropout(0.3)(x)
+        x = layers.Dense(256, activation='relu')(x)
+        x = layers.Dense(128, activation=None)(x)
+        x = layers.Lambda(lambda v: tf.math.l2_normalize(v, axis=1), name="l2_norm")(x)
+
+        embedding_model = models.Model(inputs, x, name="MobileNetV2_Embedding")
+
+        dummy = tf.zeros((1, 128, 128, 3))
+        _ = embedding_model(dummy)
+
+        embedding_model.load_weights(WEIGHTS_PATH, by_name=True, skip_mismatch=True)
+        print("✅ Siamese model loaded successfully")
         return embedding_model
 
     except Exception as e:
@@ -307,7 +335,6 @@ def load_siamese_model():
         import traceback
         st.code(traceback.format_exc())
         return None
-        
 @st.cache_resource
 def load_reference_embeddings():
     embeddings = {}
