@@ -1,6 +1,5 @@
--c constraints.txt
 streamlit==1.32.2
-numpy==1.26.4
+numpy==1.23.5
 Pillow==10.2.0
 deepface==0.0.86
 tensorflow==2.12.0
