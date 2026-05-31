@@ -9,6 +9,7 @@ try:
 except Exception as e:
     print("cv2 FULL ERROR:", repr(e))
     traceback.print_exc()
+    cv2 = None   # חשוב: לא להפיל את האפליקציה
 
 # --- ספריות כלליות ---
 import streamlit as st
@@ -21,23 +22,41 @@ from datetime import datetime
 import pandas as pd
 from io import BytesIO
 
-def lazy_import_deepface():
-    from deepface import DeepFace
-    return DeepFace
 
+# --- טעינה בטוחה של DeepFace ---
+def lazy_import_deepface():
+    try:
+        from deepface import DeepFace
+        print("DeepFace loaded successfully")
+        return DeepFace
+    except Exception as e:
+        print("DeepFace import ERROR:", e)
+        return None
+
+
+# --- טעינה בטוחה של rembg ---
 def lazy_import_rembg():
-    from rembg import remove
-    return remove
+    try:
+        from rembg import remove
+        print("rembg loaded successfully")
+        return remove
+    except Exception as e:
+        print("rembg import ERROR:", e)
+        return None
+
 
 DeepFace = lazy_import_deepface()
 remove = lazy_import_rembg()
 
+
+# --- הגדרות Streamlit ---
 st.set_page_config(
     page_title="Smart Attendance",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
+# --- משתני Session ---
 if "mode" not in st.session_state:
     st.session_state.mode = "upload"
 if "collected_photos" not in st.session_state:
@@ -49,9 +68,11 @@ if "absence_counter" not in st.session_state:
 if "model_choice" not in st.session_state:
     st.session_state.model_choice = "DeepFace Facenet512"
 
+# --- קבועים ---
 ABSENCE_THRESHOLD = 3
 SIAMESE_WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "my_siamese3_weights.weights.h5")
 SIAMESE_THRESHOLD = 0.49  # Best Threshold (95% Recall)
+
 
 css = """
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"/>
