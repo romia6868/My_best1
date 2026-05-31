@@ -291,41 +291,15 @@ STUDENT_ROSTER = st.session_state.student_roster
 def load_siamese_model():
     try:
         import tensorflow as tf
-        from tensorflow.keras import layers, models
-        from tensorflow.keras.applications import MobileNetV2, mobilenet_v2
 
-        IMG_SHAPE = (128, 128, 3)
-
-        def build_pro_embedding():
-            base_model = MobileNetV2(
-                input_shape=IMG_SHAPE,
-                include_top=False,
-                weights='imagenet'
-            )
-
-            base_model.trainable = True
-            for layer in base_model.layers[:-50]:
-                layer.trainable = False
-
-            model = models.Sequential([
-                layers.Lambda(mobilenet_v2.preprocess_input),  # ← חזרה לגרסה המקורית
-                base_model,
-                layers.GlobalAveragePooling2D(),
-                layers.Dense(512, activation='relu'),
-                layers.BatchNormalization(),
-                layers.Dropout(0.3),
-                layers.Dense(256, activation='relu'),
-                layers.Dense(128, activation=None),
-                layers.Lambda(lambda x: tf.math.l2_normalize(x, axis=1), name="l2_norm")
-            ], name="MobileNetV2_Embedding")
-
-            return model
-
-        embedding_model = build_pro_embedding()
-        dummy = tf.zeros((1, 128, 128, 3))
-        _ = embedding_model(dummy)
-        embedding_model.load_weights(SIAMESE_WEIGHTS_PATH, by_name=False, skip_mismatch=True)
-        print("✅ Siamese model loaded successfully")
+        MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "my_siamese3_model.h5")
+        
+        if not os.path.exists(MODEL_PATH):
+            st.error(f"Model file not found: {MODEL_PATH}")
+            return None
+            
+        embedding_model = tf.keras.models.load_model(MODEL_PATH, compile=False)
+        print("✅ Model loaded successfully")
         return embedding_model
 
     except Exception as e:
