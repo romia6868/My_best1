@@ -329,9 +329,11 @@ def load_siamese_model():
         return embedding_model
 
     except Exception as e:
-        st.error(f"Could not load Siamese model: {e}")
-        return None
-
+            st.error(f"Could not load Siamese model: {e}")
+            import traceback
+            st.code(traceback.format_exc())  # ← הוסיפי את השורה הזו
+            return None
+           
 @st.cache_resource
 def load_reference_embeddings():
     embeddings = {}
