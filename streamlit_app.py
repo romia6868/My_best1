@@ -776,8 +776,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         and siamese_model is not None
     )
 
-
-    # --- UI: סריקה ---
     scan_placeholder = st.empty()
     scan_placeholder.markdown("""
     <div class="scan-container">
@@ -794,23 +792,15 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     progress.progress(30, text="Analyzing faces...")
     scan_placeholder.empty()
 
-    # --- בחירת מודל ---
     if use_siamese:
-        st.markdown(
-            '<div class="model-badge model-badge-siamese"><span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> Using: My Siamese Network</div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown('<div class="model-badge model-badge-siamese"><span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> Using: My Siamese Network</div>', unsafe_allow_html=True)
         active_embeddings = siamese_embeddings
         active_threshold = SIAMESE_THRESHOLD
     else:
-        st.markdown(
-            '<div class="model-badge model-badge-deepface"><span class="material-symbols-outlined" style="font-size:14px;">hub</span> Using: DeepFace Facenet512</div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown('<div class="model-badge model-badge-deepface"><span class="material-symbols-outlined" style="font-size:14px;">hub</span> Using: DeepFace Facenet512</div>', unsafe_allow_html=True)
         active_embeddings = reference_embeddings
         active_threshold = threshold
 
-    # --- לולאת השוואה חדשה ---
     present_students = {}
     recognized_faces = []
     total = max(len(faces), 1)
@@ -818,12 +808,8 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     for i, data in enumerate(faces):
         img = data["face"]
         box = data["box"]
-        progress.progress(
-            30 + int(60 * i / total),
-            text=f"Identifying face {i+1} of {len(faces)}...",
-        )
+        progress.progress(30 + int(60 * i / total), text=f"Identifying face {i+1} of {len(faces)}...")
 
-        # --- הפקת embedding ---
         try:
             if use_siamese:
                 emb = get_embedding_siamese(img)
@@ -837,48 +823,29 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                 emb = np.array(result[0]["embedding"])
                 emb = emb / np.linalg.norm(emb)
         except Exception as e:
-            st.write(f"❌ Failed to extract embedding: {e}")
             continue
 
-        # --- אם אין אמבדינגים להשוואה ---
         if not active_embeddings:
-            st.write("⚠ No reference embeddings loaded!")
             continue
 
-        # --- חישוב מרחקים ---
         distances = {}
         for name, ref_embs in active_embeddings.items():
             if use_siamese:
                 d = min(euclidean_distance(emb, r) for r in ref_embs)
             else:
                 d = min(cosine_distance(emb, r) for r in ref_embs)
-
             distances[name] = d
-          
-        
-        # --- החלטה אם זה ידוע או לא ---
+
+        best_name, best_dist = min(distances.items(), key=lambda x: x[1])
+
         if best_dist <= active_threshold:
             if best_name not in present_students:
                 present_students[best_name] = {"img": img, "unknown": False}
-                recognized_faces.append(
-                    {
-                        "name": best_name,
-                        "box": box,
-                        "dist": best_dist,
-                        "unknown": False,
-                    }
-                )
+                recognized_faces.append({"name": best_name, "box": box, "dist": best_dist, "unknown": False})
         else:
             unknown_key = f"Unknown_{i}"
             present_students[unknown_key] = {"img": img, "unknown": True}
-            recognized_faces.append(
-                {
-                    "name": "Unknown",
-                    "box": box,
-                    "dist": best_dist,
-                    "unknown": True,
-                }
-            )
+            recognized_faces.append({"name": "Unknown", "box": box, "dist": best_dist, "unknown": True})
 
     # --- המשך הפונקציה (ציור, סטטיסטיקות וכו') ---
     progress.progress(100, text="Done!")
