@@ -835,6 +835,9 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                 d = min(cosine_distance(emb, r) for r in ref_embs)
             distances[name] = d
 
+        if not distances:
+            continue
+
         best_name, best_dist = min(distances.items(), key=lambda x: x[1])
 
         if best_dist <= active_threshold:
