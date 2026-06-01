@@ -854,12 +854,8 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                 d = min(cosine_distance(emb, r) for r in ref_embs)
 
             distances[name] = d
-            st.write(f"🔍 Comparing to {name}: distance = {d}")
-
-        # --- בחירת ההתאמה הטובה ביותר ---
-        best_name, best_dist = min(distances.items(), key=lambda x: x[1])
-        st.write(f"➡ Best match: {best_name} (dist={best_dist}, threshold={active_threshold})")
-
+          
+        
         # --- החלטה אם זה ידוע או לא ---
         if best_dist <= active_threshold:
             if best_name not in present_students:
@@ -936,9 +932,11 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     all_students = os.listdir(REFERENCE_DIR)
     if len(known_present) == len(all_students):
         st.success("🎉 Everyone is here!")
-        with open("3.mp3", "rb") as f:
-            st.audio(f.read(), format="audio/mp3")
-        
+        audio_path = os.path.join(BASE_DIR, "3.mp3")
+        if os.path.exists(audio_path):
+            with open(audio_path, "rb") as f:
+                st.audio(f.read(), format="audio/mp3")
+   
     st.markdown(f"""
     <div class="stat-row">
         <div class="stat-card">
