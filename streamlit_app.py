@@ -892,25 +892,28 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         "date": date_str
     }
 
-    all_students = os.listdir(REFERENCE_DIR)
+ import base64
+
+def play_autoplay_sound(path):
+    if not os.path.exists(path):
+        return
+    with open(path, "rb") as f:
+        audio_bytes = f.read()
+    audio_b64 = base64.b64encode(audio_bytes).decode()
+
+    st.markdown(
+        f"""
+        <audio autoplay>
+            <source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">
+        </audio>
+        """,
+        unsafe_allow_html=True
+    )
+all_students = os.listdir(REFERENCE_DIR)
 if len(known_present) == len(all_students):
     st.success("🎉 Everyone is here!")
+    play_autoplay_sound(os.path.join(BASE_DIR, "3.mp3"))
 
-    audio_path = os.path.join(BASE_DIR, "3.mp3")
-    if os.path.exists(audio_path):
-        import base64
-        with open(audio_path, "rb") as f:
-            audio_bytes = f.read()
-        audio_b64 = base64.b64encode(audio_bytes).decode()
-
-        st.markdown(
-            f"""
-            <audio autoplay>
-                <source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">
-            </audio>
-            """,
-            unsafe_allow_html=True
-        )
 
     st.markdown(f"""
     <div class="stat-row">
@@ -950,6 +953,7 @@ if chronic_absent:
     </div>
     """, unsafe_allow_html=True)
 
+
 # --- התראה על Unknown ---
 has_unknown = any(v["unknown"] for v in present_students.values())
 if has_unknown:
@@ -983,28 +987,25 @@ if present_students:
         with cols[i % 5]:
             st.markdown('<div class="student-card">', unsafe_allow_html=True)
 
-            # --- תמונת הזיהוי מהסריקה ---
+            # תמונת הזיהוי מהסריקה
             st.image(data["img"], width=110)
 
             if data["unknown"]:
-                # --- לא מזוהה ---
                 st.markdown(
                     '<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div>'
                     '<div style="text-align:center;color:#b07040;font-size:11px;">Not in roster</div>',
                     unsafe_allow_html=True
                 )
-
             else:
-                # --- תלמיד מזוהה ---
+                # תמונה קטנה להשוואה
                 if name in reference_photos:
-                    # תמונה קטנה להשוואה אינטואיטיבית
                     small = reference_photos[name].copy()
                     small.thumbnail((55, 55))
 
                     st.markdown(
                         '<div style="border-top:1px dashed #e4dff0;margin-top:6px;padding-top:4px;'
                         'display:flex;align-items:center;gap:6px;justify-content:center;">'
-                        '<span style="font-size:9px;color:#a098b8;white-space:nowrap;">📎 ref</span>'
+                        '<span style="font-size:9px;color:#a098b8;">📎 ref</span>'
                         '</div>',
                         unsafe_allow_html=True
                     )
@@ -1016,9 +1017,6 @@ if present_students:
                 )
 
             st.markdown('</div>', unsafe_allow_html=True)
-
-else:
-    st.info("No present students detected.")
 
 
 # ============================
@@ -1059,9 +1057,9 @@ if missing:
             )
 
             st.markdown('</div>', unsafe_allow_html=True)
-
 else:
     st.success("Everyone's here today!")
+
 
 # ---- Mode content ----
 if st.session_state.mode == "upload":
