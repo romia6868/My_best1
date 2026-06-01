@@ -894,13 +894,18 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
     all_students = os.listdir(REFERENCE_DIR)
     if len(known_present) == len(all_students):
-        st.success("🎉 Everyone is here!")          # 
-        audio_path = os.path.join(BASE_DIR, "3.mp3")  #
-        if os.path.exists(audio_path):              #
+        st.success("🎉 Everyone is here!")
+        audio_path = os.path.join(BASE_DIR, "3.mp3")
+        if os.path.exists(audio_path):
             with open(audio_path, "rb") as f:
                 audio_bytes = f.read()
             audio_b64 = __import__('base64').b64encode(audio_bytes).decode()
-            st.markdown(f'<audio autoplay><source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3"></audio>', unsafe_allow_html=True)
+            st.markdown(
+                f'<audio autoplay controls style="width:100%;margin-top:8px;">'
+                f'<source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">'
+                f'</audio>',
+                unsafe_allow_html=True
+            )
     st.markdown(f"""
     <div class="stat-row">
         <div class="stat-card">
@@ -951,8 +956,8 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span>Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
-    if present_students:   # ← צריך להיות 4 רווחים בדיוק, לא יותר
+   st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span>Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
+    if present_students:
         cols = st.columns(5)
         for i, (name, data) in enumerate(present_students.items()):
             with cols[i % 5]:
@@ -962,13 +967,13 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                     st.markdown('<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div><div style="text-align:center;color:#b07040;font-size:11px;">Not in roster</div></div>', unsafe_allow_html=True)
                 else:
                     st.markdown('<div class="student-card">', unsafe_allow_html=True)
-                    col_a, col_b = st.columns(2)
-                    with col_a:
-                        st.image(data["img"], width=80, caption="Detected")
-                    with col_b:
-                        if name in reference_photos:
-                            st.image(reference_photos[name], width=80, caption="Reference")
-                    st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;">{name}</div></div>', unsafe_allow_html=True)
+                    st.image(data["img"], width=110)
+                    if name in reference_photos:
+                        st.markdown('<div style="display:flex;align-items:center;gap:4px;margin-top:4px;background:#f0eef4;border-radius:8px;padding:4px 6px;">'
+                                    '<span style="font-size:9px;color:#a098b8;writing-mode:vertical-rl;text-orientation:mixed;">ref</span>', unsafe_allow_html=True)
+                        st.image(reference_photos[name], width=50)
+                        st.markdown('</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;margin-top:4px;">{name}</div></div>', unsafe_allow_html=True)
                     
     st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span>Absent</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
     if missing:
