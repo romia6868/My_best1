@@ -892,28 +892,21 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         "date": date_str
     }
 
-     import base64
-
-            def play_autoplay_sound(path):
-            if not os.path.exists(path):
-                return
-            with open(path, "rb") as f:
+    all_students = os.listdir(REFERENCE_DIR)
+    if len(known_present) == len(all_students):
+        st.success("🎉 Everyone is here!")
+        audio_path = os.path.join(BASE_DIR, "3.mp3")
+        if os.path.exists(audio_path):
+            with open(audio_path, "rb") as f:
                 audio_bytes = f.read()
+            import base64
             audio_b64 = base64.b64encode(audio_bytes).decode()
-        
             st.markdown(
-                f"""
-                <audio autoplay>
-                    <source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">
-                </audio>
-                """,
+                f'<audio autoplay controls style="width:100%;margin-top:8px;">'
+                f'<source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">'
+                f'</audio>',
                 unsafe_allow_html=True
             )
-        all_students = os.listdir(REFERENCE_DIR)
-        if len(known_present) == len(all_students):
-            st.success("🎉 Everyone is here!")
-            play_autoplay_sound(os.path.join(BASE_DIR, "3.mp3"))
-        
         
             st.markdown(f"""
             <div class="stat-row">
