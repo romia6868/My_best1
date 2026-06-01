@@ -776,12 +776,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         and siamese_model is not None
     )
 
-    # DEBUG - הוסיפי זמנית
-    st.write(f"siamese_model loaded: {siamese_model is not None}")
-    st.write(f"siamese_embeddings count: {len(siamese_embeddings)}")
-    st.write(f"reference_embeddings count: {len(reference_embeddings)}")
-    st.write(f"use_siamese: {use_siamese}")
-   
 
     # --- UI: סריקה ---
     scan_placeholder = st.empty()
@@ -942,7 +936,8 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     all_students = os.listdir(REFERENCE_DIR)
     if len(known_present) == len(all_students):
         st.success("🎉 Everyone is here!")
-        st.audio("3.mp3", autoplay=True)
+        with open("3.mp3", "rb") as f:
+            st.audio(f.read(), format="audio/mp3")
         
     st.markdown(f"""
     <div class="stat-row">
