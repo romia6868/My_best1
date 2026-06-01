@@ -769,7 +769,6 @@ def get_embedding_siamese(face_img):
     emb = siamese_model.predict(img_arr, verbose=0)[0]
     return emb
 
-
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     use_siamese = (
         st.session_state.model_choice == "My Siamese Network"
@@ -847,13 +846,8 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             present_students[unknown_key] = {"img": img, "unknown": True}
             recognized_faces.append({"name": "Unknown", "box": box, "dist": best_dist, "unknown": True})
 
-    # --- המשך הפונקציה (ציור, סטטיסטיקות וכו') ---
     progress.progress(100, text="Done!")
     progress.empty()
-
-    # כל שאר הקוד שלך נשאר בדיוק אותו דבר
-    # (ציור תיבות, חישוב נוכחות, UI וכו')
-
 
     st.markdown(f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;">{len(faces)} faces detected</p>', unsafe_allow_html=True)
 
@@ -890,12 +884,11 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
     updated_absences = update_absences(missing)
     st.session_state.last_results = {
-    "present": list(known_present.keys()),   
-    "missing": missing,
-    "date": date_str
+        "present": list(known_present.keys()),
+        "missing": missing,
+        "date": date_str
     }
-    
-    # ⭐ סאונד שמח כשכולם נמצאים
+
     all_students = os.listdir(REFERENCE_DIR)
     if len(known_present) == len(all_students):
         st.success("🎉 Everyone is here!")
@@ -903,7 +896,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         if os.path.exists(audio_path):
             with open(audio_path, "rb") as f:
                 st.audio(f.read(), format="audio/mp3")
-   
+
     st.markdown(f"""
     <div class="stat-row">
         <div class="stat-card">
