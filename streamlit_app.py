@@ -893,19 +893,25 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     }
 
     all_students = os.listdir(REFERENCE_DIR)
-    if len(known_present) == len(all_students):
-        st.success("🎉 Everyone is here!")
-        audio_path = os.path.join(BASE_DIR, "3.mp3")
-        if os.path.exists(audio_path):
-            with open(audio_path, "rb") as f:
-                audio_bytes = f.read()
-            audio_b64 = __import__('base64').b64encode(audio_bytes).decode()
-            st.markdown(
-                f'<audio autoplay controls style="width:100%;margin-top:8px;">'
-                f'<source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">'
-                f'</audio>',
-                unsafe_allow_html=True
-            )
+if len(known_present) == len(all_students):
+    st.success("🎉 Everyone is here!")
+
+    audio_path = os.path.join(BASE_DIR, "3.mp3")
+    if os.path.exists(audio_path):
+        import base64
+        with open(audio_path, "rb") as f:
+            audio_bytes = f.read()
+        audio_b64 = base64.b64encode(audio_bytes).decode()
+
+        st.markdown(
+            f"""
+            <audio autoplay>
+                <source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">
+            </audio>
+            """,
+            unsafe_allow_html=True
+        )
+
     st.markdown(f"""
     <div class="stat-row">
         <div class="stat-card">
@@ -929,72 +935,133 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     </div>
     """, unsafe_allow_html=True)
 
-    chronic_absent = [s for s in missing if updated_absences.get(s, 0) >= ABSENCE_THRESHOLD]
-    if chronic_absent:
-        names = ", ".join(chronic_absent)
-        st.markdown(f"""
-        <div style="background:#c4605a15;border:1.5px solid #c4605a50;border-radius:12px;
-            padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
-            <span class="material-symbols-outlined" style="color:#c4605a;font-size:24px;">notification_important</span>
-            <div>
-                <div style="font-weight:700;color:#a03030;font-size:14px;">Chronic absence alert!</div>
-                <div style="color:#904040;font-size:12px;">{names} have been absent {ABSENCE_THRESHOLD}+ times.</div>
-            </div>
+# --- התראה על היעדרות כרונית ---
+chronic_absent = [s for s in missing if updated_absences.get(s, 0) >= ABSENCE_THRESHOLD]
+if chronic_absent:
+    names = ", ".join(chronic_absent)
+    st.markdown(f"""
+    <div style="background:#c4605a15;border:1.5px solid #c4605a50;border-radius:12px;
+        padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
+        <span class="material-symbols-outlined" style="color:#c4605a;font-size:24px;">notification_important</span>
+        <div>
+            <div style="font-weight:700;color:#a03030;font-size:14px;">Chronic absence alert!</div>
+            <div style="color:#904040;font-size:12px;">{names} have been absent {ABSENCE_THRESHOLD}+ times.</div>
         </div>
-        """, unsafe_allow_html=True)
+    </div>
+    """, unsafe_allow_html=True)
 
-    has_unknown = any(v["unknown"] for v in present_students.values())
-    if has_unknown:
-        st.markdown("""
-        <div style="background:#ff8c0015;border:1.5px solid #ff8c0050;border-radius:12px;
-            padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
-            <span class="material-symbols-outlined" style="color:#ff8c00;font-size:24px;">warning</span>
-            <div>
-                <div style="font-weight:700;color:#c45a00;font-size:14px;">Unidentified person detected!</div>
-                <div style="color:#b07040;font-size:12px;">Someone in the photo is not in the class roster.</div>
-            </div>
+# --- התראה על Unknown ---
+has_unknown = any(v["unknown"] for v in present_students.values())
+if has_unknown:
+    st.markdown("""
+    <div style="background:#ff8c0015;border:1.5px solid #ff8c0050;border-radius:12px;
+        padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
+        <span class="material-symbols-outlined" style="color:#ff8c00;font-size:24px;">warning</span>
+        <div>
+            <div style="font-weight:700;color:#c45a00;font-size:14px;">Unidentified person detected!</div>
+            <div style="color:#b07040;font-size:12px;">Someone in the photo is not in the class roster.</div>
         </div>
-        """, unsafe_allow_html=True)
+    </div>
+    """, unsafe_allow_html=True)
 
-   st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span>Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
- st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span>Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
-    if present_students:
-        cols = st.columns(5)
-        for i, (name, data) in enumerate(present_students.items()):
-            with cols[i % 5]:
-                if data["unknown"]:
-                    st.markdown('<div class="student-card">', unsafe_allow_html=True)
-                    st.image(data["img"], width=100)
-                    st.markdown('<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div><div style="text-align:center;color:#b07040;font-size:11px;">Not in roster</div></div>', unsafe_allow_html=True)
-                else:
-                    st.markdown('<div class="student-card">', unsafe_allow_html=True)
-                    st.image(data["img"], width=110)
-                    if name in reference_photos:
-                        st.markdown(
-                            '<div style="border-top:1px dashed #e4dff0;margin-top:6px;padding-top:4px;'
-                            'display:flex;align-items:center;gap:6px;">'
-                            '<span style="font-size:9px;color:#a098b8;white-space:nowrap;">📎 ref</span>'
-                            '</div>',
-                            unsafe_allow_html=True
-                        )
-                        st.image(reference_photos[name], width=55)
-                    st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;margin-top:4px;">{name}</div></div>', unsafe_allow_html=True)
-                    
-                    
-    st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span>Absent</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
-    if missing:
-        cols = st.columns(5)
-        for i, name in enumerate(missing):
-            with cols[i % 5]:
-                st.markdown('<div class="student-card">', unsafe_allow_html=True)
+
+# ============================
+# ⭐ נוכחים
+# ============================
+
+st.markdown(
+    '<div class="section-divider"><div class="divider-line"></div>'
+    '<span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span> Present</span>'
+    '<div class="divider-line"></div></div>',
+    unsafe_allow_html=True
+)
+
+if present_students:
+    cols = st.columns(5)
+
+    for i, (name, data) in enumerate(present_students.items()):
+        with cols[i % 5]:
+            st.markdown('<div class="student-card">', unsafe_allow_html=True)
+
+            # --- תמונת הזיהוי מהסריקה ---
+            st.image(data["img"], width=110)
+
+            if data["unknown"]:
+                # --- לא מזוהה ---
+                st.markdown(
+                    '<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div>'
+                    '<div style="text-align:center;color:#b07040;font-size:11px;">Not in roster</div>',
+                    unsafe_allow_html=True
+                )
+
+            else:
+                # --- תלמיד מזוהה ---
                 if name in reference_photos:
-                    st.image(reference_photos[name], width=100)
-                absence_count = updated_absences.get(name, 0)
-                color = "#a03030" if absence_count >= ABSENCE_THRESHOLD else "#c4605a"
-                badge = f'<span style="font-size:10px;background:#c4605a20;padding:2px 6px;border-radius:10px;">{absence_count}x</span>' if absence_count > 0 else ''
-                st.markdown(f'<div style="text-align:center;color:{color};font-weight:600;font-size:13px;">{name} {badge}</div></div>', unsafe_allow_html=True)
-    else:
-        st.success("Everyone's here today!")
+                    # תמונה קטנה להשוואה אינטואיטיבית
+                    small = reference_photos[name].copy()
+                    small.thumbnail((55, 55))
+
+                    st.markdown(
+                        '<div style="border-top:1px dashed #e4dff0;margin-top:6px;padding-top:4px;'
+                        'display:flex;align-items:center;gap:6px;justify-content:center;">'
+                        '<span style="font-size:9px;color:#a098b8;white-space:nowrap;">📎 ref</span>'
+                        '</div>',
+                        unsafe_allow_html=True
+                    )
+                    st.image(small, width=55)
+
+                st.markdown(
+                    f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;margin-top:4px;">{name}</div>',
+                    unsafe_allow_html=True
+                )
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+else:
+    st.info("No present students detected.")
+
+
+# ============================
+# ⭐ חסרים
+# ============================
+
+st.markdown(
+    '<div class="section-divider"><div class="divider-line"></div>'
+    '<span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span> Absent</span>'
+    '<div class="divider-line"></div></div>',
+    unsafe_allow_html=True
+)
+
+if missing:
+    cols = st.columns(5)
+
+    for i, name in enumerate(missing):
+        with cols[i % 5]:
+            st.markdown('<div class="student-card">', unsafe_allow_html=True)
+
+            # תמונה קטנה של התלמיד החסר
+            if name in reference_photos:
+                small = reference_photos[name].copy()
+                small.thumbnail((100, 100))
+                st.image(small, width=100)
+
+            # מונה היעדרויות
+            absence_count = updated_absences.get(name, 0)
+            color = "#a03030" if absence_count >= ABSENCE_THRESHOLD else "#c4605a"
+            badge = (
+                f'<span style="font-size:10px;background:#c4605a20;padding:2px 6px;border-radius:10px;">{absence_count}x</span>'
+                if absence_count > 0 else ''
+            )
+
+            st.markdown(
+                f'<div style="text-align:center;color:{color};font-weight:600;font-size:13px;">{name} {badge}</div>',
+                unsafe_allow_html=True
+            )
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+else:
+    st.success("Everyone's here today!")
 
 # ---- Mode content ----
 if st.session_state.mode == "upload":
