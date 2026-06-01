@@ -957,6 +957,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         """, unsafe_allow_html=True)
 
    st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span>Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
+ st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span>Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
     if present_students:
         cols = st.columns(5)
         for i, (name, data) in enumerate(present_students.items()):
@@ -969,11 +970,16 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                     st.markdown('<div class="student-card">', unsafe_allow_html=True)
                     st.image(data["img"], width=110)
                     if name in reference_photos:
-                        st.markdown('<div style="display:flex;align-items:center;gap:4px;margin-top:4px;background:#f0eef4;border-radius:8px;padding:4px 6px;">'
-                                    '<span style="font-size:9px;color:#a098b8;writing-mode:vertical-rl;text-orientation:mixed;">ref</span>', unsafe_allow_html=True)
-                        st.image(reference_photos[name], width=50)
-                        st.markdown('</div>', unsafe_allow_html=True)
+                        st.markdown(
+                            '<div style="border-top:1px dashed #e4dff0;margin-top:6px;padding-top:4px;'
+                            'display:flex;align-items:center;gap:6px;">'
+                            '<span style="font-size:9px;color:#a098b8;white-space:nowrap;">📎 ref</span>'
+                            '</div>',
+                            unsafe_allow_html=True
+                        )
+                        st.image(reference_photos[name], width=55)
                     st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;margin-top:4px;">{name}</div></div>', unsafe_allow_html=True)
+                    
                     
     st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span>Absent</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
     if missing:
