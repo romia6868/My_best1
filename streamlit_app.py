@@ -249,10 +249,10 @@ st.markdown(button_css, unsafe_allow_html=True)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ZIP_PATH = os.path.join(BASE_DIR, "My_Classmates_small.zip")
 EXTRACT_PATH = os.path.join(BASE_DIR, "My_Classmates")
+REFERENCE_DIR = os.path.join(EXTRACT_PATH, "content", "My_Classmates_small")
 if not os.path.exists(REFERENCE_DIR):
     with zipfile.ZipFile(ZIP_PATH, 'r') as zip_ref:
         zip_ref.extractall(EXTRACT_PATH)
-
 REFERENCE_DIR = os.path.join(EXTRACT_PATH, "content", "My_Classmates_small")
 ROSTER_FILE = os.path.join(BASE_DIR, "student_roster.json")
 
