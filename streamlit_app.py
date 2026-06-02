@@ -787,16 +787,35 @@ from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 def get_embedding_siamese(face_img):
     img = face_img.convert("RGB").resize((128, 128))
     img_arr = np.array(img, dtype=np.float32)
-    img_arr = preprocess_input(img_arr)   # ← כאן, לא בתוך המודל
+    img_arr = preprocess_input(img_arr)   # ← אותו preprocess כמו ב-load_siamese_embeddings
     img_arr = np.expand_dims(img_arr, axis=0)
     emb = siamese_model.predict(img_arr, verbose=0)[0]
     return emb
 
-def emoji_rain(emoji="🎉", count=30):
-    drops = "".join(
-        f'<div class="emoji-drop" style="left:{i}%; animation-delay:{i*0.05}s;">{emoji}</div>'
-        for i in range(count)
-    )
+
+def emoji_rain(emoji="🎉", count=40):
+    import random
+
+    drops = ""
+    for i in range(count):
+        left = random.randint(0, 100)              # פיזור לרוחב
+        delay = random.uniform(0, 2.5)             # עיכוב שונה לכל אימוג׳י
+        duration = random.uniform(2.5, 5.5)        # מהירות נפילה שונה
+        size = random.randint(28, 52)              # גדלים שונים
+        rotate = random.randint(-45, 45)           # זווית התחלתית שונה
+
+        drops += f'''
+        <div class="emoji-drop"
+             style="
+                left:{left}%;
+                font-size:{size}px;
+                animation-delay:{delay}s;
+                animation-duration:{duration}s;
+                transform: rotate({rotate}deg);
+             ">
+            {emoji}
+        </div>
+        '''
 
     st.markdown(
         f"""
@@ -807,30 +826,36 @@ def emoji_rain(emoji="🎉", count=30):
         <style>
         .emoji-rain-container {{
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             pointer-events: none;
             overflow: hidden;
-            z-index: 9999;
+            z-index: 999999;
         }}
 
         .emoji-drop {{
             position: absolute;
-            top: -50px;
-            font-size: 40px;
-            animation: fall 2.2s linear forwards;
+            top: -60px;
+            animation-name: fall;
+            animation-timing-function: linear;
+            opacity: 0.9;
         }}
 
         @keyframes fall {{
-            0% {{ transform: translateY(-50px) rotate(0deg); opacity: 1; }}
-            100% {{ transform: translateY(110vh) rotate(360deg); opacity: 0; }}
+            0% {{
+                transform: translateY(-60px) rotate(0deg);
+                opacity: 1;
+            }}
+            100% {{
+                transform: translateY(110vh) rotate(360deg);
+                opacity: 0;
+            }}
         }}
         </style>
         """,
         unsafe_allow_html=True
     )
+
 
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     use_siamese = (
