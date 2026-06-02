@@ -971,8 +971,8 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     selected_font_path = next((p for p in font_paths if os.path.exists(p)), None)
 
     if selected_font_path:
-        font_name = ImageFont.truetype(selected_font_path, 48)
-        font_conf = ImageFont.truetype(selected_font_path, 32)
+        font_name = ImageFont.truetype(selected_font_path, 68)
+        font_conf = ImageFont.truetype(selected_font_path, 40)
     else:
         font_name = ImageFont.load_default()
         font_conf = ImageFont.load_default()
@@ -989,7 +989,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
             overlay_draw.rectangle([x, y-55, x+w, y-5], fill=(0, 0, 0, 140))
             img_draw = Image.alpha_composite(img_draw, overlay)
-            draw = ImageDraw.Draw(img_draw)  # ← חובה!
+            draw = ImageDraw.Draw(img_draw)
 
             draw.text((x+5, y-50), "Unknown", fill=(255, 180, 80), font=font_name)
 
@@ -1002,7 +1002,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
             overlay_draw.rectangle([x, y-70, x+w, y-10], fill=(0, 0, 0, 140))
             img_draw = Image.alpha_composite(img_draw, overlay)
-            draw = ImageDraw.Draw(img_draw)  # ← חובה!
+            draw = ImageDraw.Draw(img_draw)
 
             draw.text((x+5, y-65), face["name"], fill=(255, 230, 180), font=font_name)
             draw.text((x+5, y-30), f"{pct}%", fill=(255, 210, 120), font=font_conf)
@@ -1020,6 +1020,18 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         "missing": missing,
         "date": date_str
     }
+
+    # --- קונפטי + סאונד ---
+    has_unknown = any(v["unknown"] for v in present_students.values())
+
+    if len(known_present) == len(STUDENT_ROSTER) and not has_unknown:
+        play_autoplay_sound(os.path.join(BASE_DIR, "3.mp3"))
+        emoji_rain("🎉", count=60)
+        st.success("🎉 Everyone is here!")
+
+    elif has_unknown:
+        emoji_rain("⚠️", count=50)
+        st.warning("⚠️ Unidentified person detected!")
 
     # --- נוכחים ---
     st.markdown(
@@ -1060,8 +1072,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                 st.markdown(f'<div style="text-align:center;color:#c4605a;font-weight:600;font-size:13px;">{name}</div>', unsafe_allow_html=True)
     else:
         st.success("Everyone's here today!")
-
-
 
 
 
