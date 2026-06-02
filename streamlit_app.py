@@ -76,93 +76,164 @@ SIAMESE_WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 SIAMESE_THRESHOLD = 0.49  # Best Threshold (95% Recall)
 
 import time
+import streamlit as st
 
-# אנטי-קאש — מספר גרסה חדש בכל טעינה
-version = int(time.time())
+css_version = int(time.time())
 
-# ============================
-# ⭐ CSS ראשי של האפליקציה
-# ============================
-css = f"""
-<!-- פונט כללי לאפליקציה -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&display=swap&v={version}">
+# טעינת הפונטים
+st.markdown(
+    f"""
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&display=swap&v={css_version}">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libertinus+Keyboard&display=swap&v={css_version}">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&v={css_version}">
+""",
+    unsafe_allow_html=True,
+)
 
-<!-- פונט לכותרת Smart Attendance -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libertinus+Keyboard&display=swap&v={version}">
-
-<!-- אייקונים -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&v={version}" />
-
+css = """
 <style>
 
-/* ⭐ כל האפליקציה בפונט Cinzel */
-body, * {
-    font-family: "Cinzel", serif;
+/* כל האפליקציה בפונט Cinzel */
+html, body, [class*="css"], .stApp {
+    font-family: "Cinzel", serif !important;
 }
 
-/* ⭐ רק הכותרת Smart Attendance בפונט Libertinus Keyboard */
+/* כותרת */
 .bungee-title {
-    font-family: "Libertinus Keyboard", system-ui !important;
+    font-family: "Libertinus Keyboard", serif !important;
     font-weight: 400;
     font-style: normal;
 }
 
-/* ⭐ אייקונים נשארים כמו שהם */
+/* אייקונים */
 .material-symbols-outlined {
-    font-family: 'Material Symbols Outlined' !important;
-    font-weight: normal; font-style: normal; font-size: 22px;
-    line-height: 1; letter-spacing: normal; text-transform: none;
-    display: inline-block; white-space: nowrap;
-    -webkit-font-feature-settings: 'liga'; font-feature-settings: 'liga';
+    font-family: "Material Symbols Outlined" !important;
+    font-weight: normal;
+    font-style: normal;
+    font-size: 22px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    -webkit-font-feature-settings: "liga";
+    font-feature-settings: "liga";
     -webkit-font-smoothing: antialiased;
 }
 
-/* ⭐ כל שאר ה‑CSS שלך */
-YOUR_FULL_CSS_HERE
+/* רקע כללי */
+.stApp {
+    background: #f0eef4 !important;
+}
+
+/* Header */
+.main-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 1.5rem 0 1rem;
+    border-bottom: 1px solid #e4dff0;
+    margin-bottom: 1.5rem;
+}
+
+.header-icon {
+    width: 52px;
+    height: 52px;
+    background: linear-gradient(135deg, #b8a9c9, #9585b0);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.header-icon .material-symbols-outlined {
+    font-size: 28px;
+    color: white;
+}
+
+.header-title {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #6b5a8a, #9585b0, #c4b8d8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background: #e8e4f0 !important;
+    border-right: 1px solid #e4dff0 !important;
+}
+
+.sidebar-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #4a3a6a;
+    margin-bottom: 1rem;
+}
+
+.sidebar-student {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: #f0eef4;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: #4a3a6a;
+    border: 1px solid #e4dff0;
+}
+
+/* Upload */
+.upload-zone {
+    border: 1.5px dashed #c4b8d8;
+    border-radius: 14px;
+    padding: 2.5rem;
+    text-align: center;
+    background: #ebe8f240;
+    margin-bottom: 1rem;
+}
+
+.upload-zone:hover {
+    border-color: #9585b0;
+}
+
+/* Stats */
+.stat-card {
+    background: white;
+    border: 1px solid #e4dff0;
+    border-radius: 12px;
+    padding: 16px 18px;
+}
+
+.stat-val {
+    font-size: 28px;
+    font-weight: 700;
+}
+
+.stat-green {
+    color: #68b88a;
+}
+
+.stat-red {
+    color: #d4707a;
+}
+
+.stat-gold {
+    color: #6b5a8a;
+}
 
 </style>
 """
 
-# ============================
-# ⭐ CSS של הכפתורים
-# ============================
-button_css = """
-<style>
-.stButton > button {
-    background: #ebe8f2 !important; color: #4a3a6a !important;
-    border: 1.5px solid #e4dff0 !important; border-radius: 10px !important;
-    padding: 11px 16px !important; font-size: 14px !important;
-    font-weight: 500 !important; width: 100% !important;
-    transition: all 0.2s !important;
-    font-family: 'Space Grotesk', sans-serif !important; margin-top: 0 !important;
-}
-.stButton > button:hover {
-    border-color: #9585b0 !important; transform: translateY(-2px) !important;
-    box-shadow: 0 4px 12px #b8a9c930 !important;
-}
-.stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, #b8a9c9, #9585b0) !important;
-    color: white !important; border: none !important;
-    box-shadow: 0 4px 14px #b8a9c940 !important;
-    padding: 13px 28px !important; font-size: 15px !important;
-    font-weight: 600 !important; margin-top: 12px !important;
-}
-.stButton > button[kind="primary"]:hover {
-    filter: brightness(1.08) !important; transform: translateY(-2px) !important;
-}
-.stDownloadButton > button {
-    background: #ebe8f2 !important; color: #9585b0 !important;
-    border: 1.5px solid #b8a9c9 !important; border-radius: 10px !important;
-    font-size: 13px !important; font-weight: 600 !important;
-    width: 100% !important; transition: all 0.2s !important; margin-top: 8px !important;
-}
-.stDownloadButton > button:hover { background: #e4dff0 !important; transform: translateY(-1px) !important; }
-</style>
-"""
-
-# טעינת ה‑CSS בפועל
 st.markdown(css, unsafe_allow_html=True)
-st.markdown(button_css, unsafe_allow_html=True)
+
+# אם קיים CSS נוסף לכפתורים
+try:
+    st.markdown(button_css, unsafe_allow_html=True)
+except NameError:
+    pass
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ZIP_PATH = os.path.join(BASE_DIR, "My_Classmates_small.zip")
