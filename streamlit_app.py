@@ -792,6 +792,24 @@ def get_embedding_siamese(face_img):
     emb = siamese_model.predict(img_arr, verbose=0)[0]
     return emb
 
+def emoji_confetti(emoji="🎉"):
+    st.markdown(
+        f"""
+        <div style="font-size: 60px; text-align: center; animation: pop 0.6s ease-out;">
+            {emoji}
+        </div>
+
+        <style>
+        @keyframes pop {{
+            0% {{ transform: scale(0.2); opacity: 0; }}
+            60% {{ transform: scale(1.3); opacity: 1; }}
+            100% {{ transform: scale(1); }}
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     use_siamese = (
         st.session_state.model_choice == "My Siamese Network"
@@ -862,6 +880,10 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             continue
 
         best_name, best_dist = min(distances.items(), key=lambda x: x[1])
+
+        if use_siamese:
+            st.write("SIAMESE DIST:", best_name, best_dist)
+
 
         if best_dist <= active_threshold:
             if best_name not in present_students:
