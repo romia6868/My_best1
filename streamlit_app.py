@@ -77,13 +77,17 @@ SIAMESE_THRESHOLD = 0.49  # Best Threshold (95% Recall)
 
 
 css = """
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&display=swap"/>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee+Shade&display=swap"/>
 <style>
-* { font-family: 'Space Grotesk', sans-serif !important; }
+* {
+    font-family: 'Cinzel', serif !important;
+    font-optical-sizing: auto;
+}
 .material-symbols-outlined {
     font-family: 'Material Symbols Outlined' !important;
-    font-weight: normal; font-style: normal; font-size: 22px;
+    font-weight: 500; font-style: normal; font-size: 22px;
     line-height: 1; letter-spacing: normal; text-transform: none;
     display: inline-block; white-space: nowrap;
     -webkit-font-feature-settings: 'liga'; font-feature-settings: 'liga';
@@ -122,9 +126,14 @@ css = """
 }
 .header-icon .material-symbols-outlined { font-size: 28px; color: white; }
 .header-title {
-    font-size: 28px; font-weight: 700;
+    font-family: 'Bungee Shade', sans-serif !important;
+    font-size: 28px;
+    font-weight: 400;
+    font-style: normal;
+
     background: linear-gradient(90deg, #6b5a8a, #9585b0, #c4b8d8);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 .scan-container { position: relative; display: inline-block; width: 100%; }
 .scan-overlay {
@@ -215,9 +224,9 @@ button_css = """
     background: #ebe8f2 !important; color: #4a3a6a !important;
     border: 1.5px solid #e4dff0 !important; border-radius: 10px !important;
     padding: 11px 16px !important; font-size: 14px !important;
-    font-weight: 500 !important; width: 100% !important;
+    font-weight: 700 !important; width: 100% !important;
     transition: all 0.2s !important;
-    font-family: 'Space Grotesk', sans-serif !important; margin-top: 0 !important;
+   font-family: 'Cinzel', serif !important; margin-top: 0 !important;
 }
 .stButton > button:hover {
     border-color: #9585b0 !important; transform: translateY(-2px) !important;
@@ -933,144 +942,144 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         
         # --- התראה על היעדרות כרונית ---
        # --- התראה על היעדרות כרונית ---
-chronic_absent = [s for s in missing if updated_absences.get(s, 0) >= ABSENCE_THRESHOLD]
-if chronic_absent:
-    names = ", ".join(chronic_absent)
-    st.markdown(f"""
-    <div style="background:#c4605a15;border:1.5px solid #c4605a50;border-radius:12px;
-        padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
-        <span class="material-symbols-outlined" style="color:#c4605a;font-size:24px;">notification_important</span>
-        <div>
-            <div style="font-weight:700;color:#a03030;font-size:14px;">Chronic absence alert!</div>
-            <div style="color:#904040;font-size:12px;">{names} have been absent {ABSENCE_THRESHOLD}+ times.</div>
+    chronic_absent = [s for s in missing if updated_absences.get(s, 0) >= ABSENCE_THRESHOLD]
+    if chronic_absent:
+        names = ", ".join(chronic_absent)
+        st.markdown(f"""
+        <div style="background:#c4605a15;border:1.5px solid #c4605a50;border-radius:12px;
+            padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
+            <span class="material-symbols-outlined" style="color:#c4605a;font-size:24px;">notification_important</span>
+            <div>
+                <div style="font-weight:700;color:#a03030;font-size:14px;">Chronic absence alert!</div>
+                <div style="color:#904040;font-size:12px;">{names} have been absent {ABSENCE_THRESHOLD}+ times.</div>
+            </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-
-# --- התראה על Unknown ---
-has_unknown = any(v["unknown"] for v in present_students.values())
-if has_unknown:
-    st.markdown("""
-    <div style="background:#ff8c0015;border:1.5px solid #ff8c0050;border-radius:12px;
-        padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
-        <span class="material-symbols-outlined" style="color:#ff8c00;font-size:24px;">warning</span>
-        <div>
-            <div style="font-weight:700;color:#c45a00;font-size:14px;">Unidentified person detected!</div>
-            <div style="color:#b07040;font-size:12px;">Someone in the photo is not in the class roster.</div>
+        """, unsafe_allow_html=True)
+    
+    
+    # --- התראה על Unknown ---
+    has_unknown = any(v["unknown"] for v in present_students.values())
+    if has_unknown:
+        st.markdown("""
+        <div style="background:#ff8c0015;border:1.5px solid #ff8c0050;border-radius:12px;
+            padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
+            <span class="material-symbols-outlined" style="color:#ff8c00;font-size:24px;">warning</span>
+            <div>
+                <div style="font-weight:700;color:#c45a00;font-size:14px;">Unidentified person detected!</div>
+                <div style="color:#b07040;font-size:12px;">Someone in the photo is not in the class roster.</div>
+            </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-
-# ============================
-# ⭐ לוגיקת UX חכמה (קונפטי + סאונד)
-# ============================
-
-# 🎯 מצב 1 — כולם נוכחים ואין Unknown
-if len(known_present) == len(STUDENT_ROSTER) and not has_unknown:
-    play_autoplay_sound(os.path.join(BASE_DIR, "3.mp3"))
-    emoji_confetti("🎉")   # קונפטי שמח
-
-# 🚨 מצב 2 — יש Unknown
-elif has_unknown:
-    emoji_confetti("🚨")   # קונפטי אזהרה
-
-# 😐 מצב 3 — יש חסרים אבל אין Unknown
-else:
-    pass  # בלי קונפטי ובלי סאונד
-
-
-# ============================
-# ⭐ נוכחים
-# ============================
-
-st.markdown(
-    '<div class="section-divider"><div class="divider-line"></div>'
-    '<span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span> Present</span>'
-    '<div class="divider-line"></div></div>',
-    unsafe_allow_html=True
-)
-
-if present_students:
-    cols = st.columns(5)
-
-    for i, (name, data) in enumerate(present_students.items()):
-        with cols[i % 5]:
-            st.markdown('<div class="student-card">', unsafe_allow_html=True)
-
-            # תמונת הזיהוי מהסריקה
-            st.image(data["img"], width=110)
-
-            if data["unknown"]:
-                st.markdown(
-                    '<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div>'
-                    '<div style="text-align:center;color:#b07040;font-size:11px;">Not in roster</div>',
-                    unsafe_allow_html=True
-                )
-            else:
-                # תמונה קטנה להשוואה
-                if name in reference_photos:
-                    small = reference_photos[name].copy()
-                    small.thumbnail((55, 55))
-
+        """, unsafe_allow_html=True)
+    
+    
+    # ============================
+    # ⭐ לוגיקת UX חכמה (קונפטי + סאונד)
+    # ============================
+    
+    # 🎯 מצב 1 — כולם נוכחים ואין Unknown
+    if len(known_present) == len(STUDENT_ROSTER) and not has_unknown:
+        play_autoplay_sound(os.path.join(BASE_DIR, "3.mp3"))
+        emoji_confetti("🎉")   # קונפטי שמח
+    
+    # 🚨 מצב 2 — יש Unknown
+    elif has_unknown:
+        emoji_confetti("🚨")   # קונפטי אזהרה
+    
+    # 😐 מצב 3 — יש חסרים אבל אין Unknown
+    else:
+        pass  # בלי קונפטי ובלי סאונד
+    
+    
+    # ============================
+    # ⭐ נוכחים
+    # ============================
+    
+    st.markdown(
+        '<div class="section-divider"><div class="divider-line"></div>'
+        '<span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span> Present</span>'
+        '<div class="divider-line"></div></div>',
+        unsafe_allow_html=True
+    )
+    
+    if present_students:
+        cols = st.columns(5)
+    
+        for i, (name, data) in enumerate(present_students.items()):
+            with cols[i % 5]:
+                st.markdown('<div class="student-card">', unsafe_allow_html=True)
+    
+                # תמונת הזיהוי מהסריקה
+                st.image(data["img"], width=110)
+    
+                if data["unknown"]:
                     st.markdown(
-                        '<div style="border-top:1px dashed #e4dff0;margin-top:6px;padding-top:4px;'
-                        'display:flex;align-items:center;gap:6px;justify-content:center;">'
-                        '<span style="font-size:9px;color:#a098b8;">📎 ref</span>'
-                        '</div>',
+                        '<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div>'
+                        '<div style="text-align:center;color:#b07040;font-size:11px;">Not in roster</div>',
                         unsafe_allow_html=True
                     )
-                    st.image(small, width=55)
-
+                else:
+                    # תמונה קטנה להשוואה
+                    if name in reference_photos:
+                        small = reference_photos[name].copy()
+                        small.thumbnail((55, 55))
+    
+                        st.markdown(
+                            '<div style="border-top:1px dashed #e4dff0;margin-top:6px;padding-top:4px;'
+                            'display:flex;align-items:center;gap:6px;justify-content:center;">'
+                            '<span style="font-size:9px;color:#a098b8;">📎 ref</span>'
+                            '</div>',
+                            unsafe_allow_html=True
+                        )
+                        st.image(small, width=55)
+    
+                    st.markdown(
+                        f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;margin-top:4px;">{name}</div>',
+                        unsafe_allow_html=True
+                    )
+    
+                st.markdown('</div>', unsafe_allow_html=True)
+    
+    
+    # ============================
+    # ⭐ חסרים
+    # ============================
+    
+    st.markdown(
+        '<div class="section-divider"><div class="divider-line"></div>'
+        '<span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span> Absent</span>'
+        '<div class="divider-line"></div></div>',
+        unsafe_allow_html=True
+    )
+    
+    if missing:
+        cols = st.columns(5)
+    
+        for i, name in enumerate(missing):
+            with cols[i % 5]:
+                st.markdown('<div class="student-card">', unsafe_allow_html=True)
+    
+                # תמונה קטנה של התלמיד החסר
+                if name in reference_photos:
+                    small = reference_photos[name].copy()
+                    small.thumbnail((100, 100))
+                    st.image(small, width=100)
+    
+                # מונה היעדרויות
+                absence_count = updated_absences.get(name, 0)
+                color = "#a03030" if absence_count >= ABSENCE_THRESHOLD else "#c4605a"
+                badge = (
+                    f'<span style="font-size:10px;background:#c4605a20;padding:2px 6px;border-radius:10px;">{absence_count}x</span>'
+                    if absence_count > 0 else ''
+                )
+    
                 st.markdown(
-                    f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;margin-top:4px;">{name}</div>',
+                    f'<div style="text-align:center;color:{color};font-weight:600;font-size:13px;">{name} {badge}</div>',
                     unsafe_allow_html=True
                 )
-
-            st.markdown('</div>', unsafe_allow_html=True)
-
-
-# ============================
-# ⭐ חסרים
-# ============================
-
-st.markdown(
-    '<div class="section-divider"><div class="divider-line"></div>'
-    '<span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span> Absent</span>'
-    '<div class="divider-line"></div></div>',
-    unsafe_allow_html=True
-)
-
-if missing:
-    cols = st.columns(5)
-
-    for i, name in enumerate(missing):
-        with cols[i % 5]:
-            st.markdown('<div class="student-card">', unsafe_allow_html=True)
-
-            # תמונה קטנה של התלמיד החסר
-            if name in reference_photos:
-                small = reference_photos[name].copy()
-                small.thumbnail((100, 100))
-                st.image(small, width=100)
-
-            # מונה היעדרויות
-            absence_count = updated_absences.get(name, 0)
-            color = "#a03030" if absence_count >= ABSENCE_THRESHOLD else "#c4605a"
-            badge = (
-                f'<span style="font-size:10px;background:#c4605a20;padding:2px 6px;border-radius:10px;">{absence_count}x</span>'
-                if absence_count > 0 else ''
-            )
-
-            st.markdown(
-                f'<div style="text-align:center;color:{color};font-weight:600;font-size:13px;">{name} {badge}</div>',
-                unsafe_allow_html=True
-            )
-
-            st.markdown('</div>', unsafe_allow_html=True)
-else:
-    st.success("Everyone's here today!")
+    
+                st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.success("Everyone's here today!")
 
 
 # ---- Mode content ----
