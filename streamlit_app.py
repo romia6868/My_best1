@@ -71,7 +71,7 @@ if "model_choice" not in st.session_state:
 # --- קבועים ---
 ABSENCE_THRESHOLD = 3
 SIAMESE_WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "my_siamese3_weights.weights.h5")
-SIAMESE_THRESHOLD = 0.49  # Best Threshold (95% Recall)
+SIAMESE_THRESHOLD = 1.45
 
 
 css = """<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&display=swap"/>
@@ -792,18 +792,40 @@ def get_embedding_siamese(face_img):
     emb = siamese_model.predict(img_arr, verbose=0)[0]
     return emb
 
-def emoji_confetti(emoji="🎉"):
+def emoji_rain(emoji="🎉", count=30):
+    drops = "".join(
+        f'<div class="emoji-drop" style="left:{i}%; animation-delay:{i*0.05}s;">{emoji}</div>'
+        for i in range(count)
+    )
+
     st.markdown(
         f"""
-        <div style="font-size: 60px; text-align: center; animation: pop 0.6s ease-out;">
-            {emoji}
+        <div class="emoji-rain-container">
+            {drops}
         </div>
 
         <style>
-        @keyframes pop {{
-            0% {{ transform: scale(0.2); opacity: 0; }}
-            60% {{ transform: scale(1.3); opacity: 1; }}
-            100% {{ transform: scale(1); }}
+        .emoji-rain-container {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 9999;
+        }}
+
+        .emoji-drop {{
+            position: absolute;
+            top: -50px;
+            font-size: 40px;
+            animation: fall 2.2s linear forwards;
+        }}
+
+        @keyframes fall {{
+            0% {{ transform: translateY(-50px) rotate(0deg); opacity: 1; }}
+            100% {{ transform: translateY(110vh) rotate(360deg); opacity: 0; }}
         }}
         </style>
         """,
@@ -881,10 +903,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
         best_name, best_dist = min(distances.items(), key=lambda x: x[1])
 
-        if use_siamese:
-            st.write("SIAMESE DIST:", best_name, best_dist)
-
-
+      
         if best_dist <= active_threshold:
             if best_name not in present_students:
                 present_students[best_name] = {"img": img, "unknown": False}
@@ -1015,11 +1034,13 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     # 🎯 מצב 1 — כולם נוכחים ואין Unknown
     if len(known_present) == len(STUDENT_ROSTER) and not has_unknown:
         play_autoplay_sound(os.path.join(BASE_DIR, "3.mp3"))
-        emoji_confetti("🎉")   # קונפטי שמח
+        emoji_rain("🎉", count=50)
+  # קונפטי שמח
     
     # 🚨 מצב 2 — יש Unknown
     elif has_unknown:
-        emoji_confetti("🚨")   # קונפטי אזהרה
+        emoji_rain("⚠️", count=40)
+   # קונפטי אזהרה
     
     # 😐 מצב 3 — יש חסרים אבל אין Unknown
     else:
