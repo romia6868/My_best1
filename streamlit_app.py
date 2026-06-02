@@ -337,13 +337,18 @@ def load_siamese_model():
         x = layers.Lambda(mobilenet_v2.preprocess_input)(inputs)
         x = base_model(x, training=False)
         x = layers.GlobalAveragePooling2D()(x)
-        x = layers.Dense(512, activation='relu')(x)
-        x = layers.BatchNormalization()(x)
-        x = layers.Dropout(0.3)(x)
-        x = layers.Dense(256, activation='relu')(x)
-        x = layers.Dense(128, activation=None)(x)
+        
+        # ⭐ שכבות עם שמות ייחודיים
+        x = layers.Dense(512, activation='relu', name="dense_512")(x)
+        x = layers.BatchNormalization(name="bn_512")(x)
+        x = layers.Dropout(0.3, name="dropout_512")(x)
+        
+        x = layers.Dense(256, activation='relu', name="dense_256")(x)
+        x = layers.Dense(128, activation=None, name="dense_128")(x)
+        
+        # ⭐ L2 normalization
         x = layers.Lambda(lambda v: tf.math.l2_normalize(v, axis=1), name="l2_norm")(x)
-
+        
         embedding_model = models.Model(inputs, x, name="MobileNetV2_Embedding")
 
         dummy = tf.zeros((1, 128, 128, 3))
@@ -878,6 +883,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         and siamese_model is not None
     )
 
+    # --- אנימציית סריקה ---
     scan_placeholder = st.empty()
     scan_placeholder.markdown("""
     <div class="scan-container">
@@ -894,6 +900,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     progress.progress(30, text="Analyzing faces...")
     scan_placeholder.empty()
 
+    # --- בחירת מודל ---
     if use_siamese:
         st.markdown('<div class="model-badge model-badge-siamese"><span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> Using: My Siamese Network</div>', unsafe_allow_html=True)
         active_embeddings = siamese_embeddings
@@ -903,6 +910,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         active_embeddings = reference_embeddings
         active_threshold = threshold
 
+    # --- זיהוי פנים ---
     present_students = {}
     recognized_faces = []
     total = max(len(faces), 1)
@@ -957,73 +965,63 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
     st.markdown(f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;">{len(faces)} faces detected</p>', unsafe_allow_html=True)
 
+    # --- ציור על התמונה ---
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
 
-# ============================
-# ⭐ פונט גדול וברור יותר
-# ============================
+    # --- פונט גדול וברור ---
+    font_name = None
+    font_conf = None
 
-font_name = None
-font_conf = None
+    font_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
+    ]
 
-font_paths = [
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
-]
+    selected_font_path = None
+    for path in font_paths:
+        if os.path.exists(path):
+            selected_font_path = path
+            break
 
-selected_font_path = None
-for path in font_paths:
-    if os.path.exists(path):
-        selected_font_path = path
-        break
-
-if selected_font_path:
-    font_name = ImageFont.truetype(selected_font_path, 48)
-    font_conf = ImageFont.truetype(selected_font_path, 32)
-else:
-    font_name = ImageFont.load_default()
-    font_conf = ImageFont.load_default()
-
-
-# ============================
-# ⭐ ציור מסגרות + טקסט על הפנים
-# ============================
-
-for face in recognized_faces:
-    x, y, w, h = face["box"]
-
-    overlay = Image.new("RGBA", img_draw.size, (0, 0, 0, 0))
-    overlay_draw = ImageDraw.Draw(overlay)
-
-    if face["unknown"]:
-        draw.rectangle([x, y, x+w, y+h], outline=(220, 100, 30), width=4)
-
-        overlay_draw.rectangle([x, y-55, x+w, y-5], fill=(0, 0, 0, 140))
-        img_draw = Image.alpha_composite(img_draw.convert("RGBA"), overlay)
-
-        draw.text((x+5, y-50), "Unknown", fill=(255, 180, 80), font=font_name)
-
+    if selected_font_path:
+        font_name = ImageFont.truetype(selected_font_path, 48)
+        font_conf = ImageFont.truetype(selected_font_path, 32)
     else:
-        pct = int((1 - face["dist"]) * 100) if not use_siamese else int(
-            max(0, (1 - face["dist"] / active_threshold)) * 100
-        )
+        font_name = ImageFont.load_default()
+        font_conf = ImageFont.load_default()
 
-        draw.rectangle([x, y, x+w, y+h], outline=(201, 149, 102), width=4)
+    # --- מסגרות + טקסט ---
+    for face in recognized_faces:
+        x, y, w, h = face["box"]
 
-        overlay_draw.rectangle([x, y-70, x+w, y-10], fill=(0, 0, 0, 140))
-        img_draw = Image.alpha_composite(img_draw.convert("RGBA"), overlay)
+        overlay = Image.new("RGBA", img_draw.size, (0, 0, 0, 0))
+        overlay_draw = ImageDraw.Draw(overlay)
 
-        draw.text((x+5, y-65), face["name"], fill=(255, 230, 180), font=font_name)
-        draw.text((x+5, y-30), f"{pct}%", fill=(255, 210, 120), font=font_conf)
+        if face["unknown"]:
+            draw.rectangle([x, y, x+w, y+h], outline=(220, 100, 30), width=4)
 
+            overlay_draw.rectangle([x, y-55, x+w, y-5], fill=(0, 0, 0, 140))
+            img_draw = Image.alpha_composite(img_draw.convert("RGBA"), overlay)
+
+            draw.text((x+5, y-50), "Unknown", fill=(255, 180, 80), font=font_name)
+
+        else:
+            pct = int((1 - face["dist"]) * 100) if not use_siamese else int(
+                max(0, (1 - face["dist"] / active_threshold)) * 100
+            )
+
+            draw.rectangle([x, y, x+w, y+h], outline=(201, 149, 102), width=4)
+
+            overlay_draw.rectangle([x, y-70, x+w, y-10], fill=(0, 0, 0, 140))
+            img_draw = Image.alpha_composite(img_draw.convert("RGBA"), overlay)
+
+            draw.text((x+5, y-65), face["name"], fill=(255, 230, 180), font=font_name)
+            draw.text((x+5, y-30), f"{pct}%", fill=(255, 210, 120), font=font_conf)
 
     st.image(img_draw, use_column_width=True)
 
-    # ============================
-    # ⭐ חישובי נוכחות
-    # ============================
-
+    # --- חישובי נוכחות ---
     known_present = {k: v for k, v in present_students.items() if not v["unknown"]}
     missing = [s for s in STUDENT_ROSTER if s not in known_present]
     attendance_pct = int(len(known_present) / max(len(STUDENT_ROSTER), 1) * 100)
@@ -1036,10 +1034,7 @@ for face in recognized_faces:
         "date": date_str
     }
 
-    # ============================
-    # ⭐ סטטיסטיקות + סאונד + קונפטי
-    # ============================
-
+    # --- סטטיסטיקות + קונפטי ---
     has_unknown = any(v["unknown"] for v in present_students.values())
 
     if len(known_present) == len(STUDENT_ROSTER) and not has_unknown:
@@ -1060,10 +1055,7 @@ for face in recognized_faces:
         """, unsafe_allow_html=True)
         emoji_rain("⚠️", count=50)
 
-    # ============================
-    # ⭐ התראה על היעדרות כרונית
-    # ============================
-
+    # --- התראה על היעדרות כרונית ---
     chronic_absent = [s for s in missing if updated_absences.get(s, 0) >= ABSENCE_THRESHOLD]
     if chronic_absent:
         names = ", ".join(chronic_absent)
@@ -1078,59 +1070,51 @@ for face in recognized_faces:
         </div>
         """, unsafe_allow_html=True)
 
-   # ============================
-# ⭐ נוכחים
-# ============================
+    # --- נוכחים ---
+    st.markdown(
+        '<div class="section-divider"><div class="divider-line"></div>'
+        '<span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span> Present</span>'
+        '<div class="divider-line"></div></div>',
+        unsafe_allow_html=True
+    )
 
-st.markdown(
-    '<div class="section-divider"><div class="divider-line"></div>'
-    '<span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span> Present</span>'
-    '<div class="divider-line"></div></div>',
-    unsafe_allow_html=True
-)
+    if present_students:
+        cols = st.columns(5)
 
-if present_students:
-    cols = st.columns(5)
+        for i, (name, data) in enumerate(present_students.items()):
+            with cols[i % 5]:
+                st.markdown('<div class="student-card">', unsafe_allow_html=True)
 
-    for i, (name, data) in enumerate(present_students.items()):
-        with cols[i % 5]:
-            st.markdown('<div class="student-card">', unsafe_allow_html=True)
+                st.image(data["img"], width=110)
 
-            # תמונת הזיהוי מהסריקה
-            st.image(data["img"], width=110)
-
-            if data["unknown"]:
-                st.markdown(
-                    '<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div>'
-                    '<div style="text-align:center;color:#b07040;font-size:11px;">Not in roster</div>',
-                    unsafe_allow_html=True
-                )
-            else:
-                # ⭐ תמונת השוואה קטנה — חוזרת!
-                if name in reference_photos:
-                    small = reference_photos[name].copy()
-                    small.thumbnail((55, 55))
-
+                if data["unknown"]:
                     st.markdown(
-                        '<div style="border-top:1px dashed #e4dff0;margin-top:6px;padding-top:4px;'
-                        'display:flex;align-items:center;gap:6px;justify-content:center;">'
-                        '<span style="font-size:9px;color:#a098b8;">📎 ref</span>'
-                        '</div>',
+                        '<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div>'
+                        '<div style="text-align:center;color:#b07040;font-size:11px;">Not in roster</div>',
                         unsafe_allow_html=True
                     )
-                    st.image(small, width=55)
+                else:
+                    if name in reference_photos:
+                        small = reference_photos[name].copy()
+                        small.thumbnail((55, 55))
 
-                st.markdown(
-                    f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;margin-top:4px;">{name}</div>',
-                    unsafe_allow_html=True
-                )
+                        st.markdown(
+                            '<div style="border-top:1px dashed #e4dff0;margin-top:6px;padding-top:4px;'
+                            'display:flex;align-items:center;gap:6px;justify-content:center;">'
+                            '<span style="font-size:9px;color:#a098b8;">📎 ref</span>'
+                            '</div>',
+                            unsafe_allow_html=True
+                        )
+                        st.image(small, width=55)
 
-            st.markdown('</div>', unsafe_allow_html=True)
+                    st.markdown(
+                        f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;margin-top:4px;">{name}</div>',
+                        unsafe_allow_html=True
+                    )
 
-    # ============================
-    # ⭐ חסרים
-    # ============================
+                st.markdown('</div>', unsafe_allow_html=True)
 
+    # --- חסרים ---
     st.markdown(
         '<div class="section-divider"><div class="divider-line"></div>'
         '<span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span> Absent</span>'
@@ -1145,6 +1129,7 @@ if present_students:
                 st.markdown(f'<div style="text-align:center;color:#c4605a;font-weight:600;font-size:13px;">{name}</div>', unsafe_allow_html=True)
     else:
         st.success("Everyone's here today!")
+
 
 
 
