@@ -872,7 +872,6 @@ def play_autoplay_sound(path):
             unsafe_allow_html=True
         )
 
-
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     use_siamese = (
         st.session_state.model_choice == "My Siamese Network"
@@ -925,7 +924,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                 )
                 emb = np.array(result[0]["embedding"])
                 emb = emb / np.linalg.norm(emb)
-        except Exception as e:
+        except:
             continue
 
         if not active_embeddings:
@@ -944,7 +943,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
         best_name, best_dist = min(distances.items(), key=lambda x: x[1])
 
-      
         if best_dist <= active_threshold:
             if best_name not in present_students:
                 present_students[best_name] = {"img": img, "unknown": False}
@@ -961,29 +959,23 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
-    font_name = font_conf = None
-    for path in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-                 "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]:
-        if os.path.exists(path):
-            font_name = ImageFont.truetype(path, 32)
-            font_conf = ImageFont.truetype(path, 20)
-            break
-    if not font_name:
-        font_name = ImageFont.load_default(size=32)
-        font_conf = ImageFont.load_default(size=20)
 
     for face in recognized_faces:
         x, y, w, h = face["box"]
         if face["unknown"]:
             draw.rectangle([x, y, x+w, y+h], outline=(220,100,30), width=3)
-            draw.text((x, y-42), "Unknown", fill=(220,100,30), font=font_name)
+            draw.text((x, y-42), "Unknown", fill=(220,100,30))
         else:
             pct = int((1 - face["dist"]) * 100) if not use_siamese else int(max(0, (1 - face["dist"] / active_threshold)) * 100)
             draw.rectangle([x, y, x+w, y+h], outline=(201,149,102), width=3)
-            draw.text((x, y-42), face["name"], fill=(181,120,74), font=font_name)
-            draw.text((x, y-20), f"{pct}%", fill=(212,168,83), font=font_conf)
+            draw.text((x, y-42), face["name"], fill=(181,120,74))
+            draw.text((x, y-20), f"{pct}%", fill=(212,168,83))
 
     st.image(img_draw, use_column_width=True)
+
+    # ============================
+    # ⭐ חישובי נוכחות
+    # ============================
 
     known_present = {k: v for k, v in present_students.items() if not v["unknown"]}
     missing = [s for s in STUDENT_ROSTER if s not in known_present]
@@ -997,153 +989,88 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         "date": date_str
     }
 
-  # ============================
-# ⭐ סטטיסטיקות + סאונד + קונפטי
-# ============================
+    # ============================
+    # ⭐ סטטיסטיקות + סאונד + קונפטי
+    # ============================
 
-# האם יש Unknown?
-has_unknown = any(v["unknown"] for v in present_students.values())
+    has_unknown = any(v["unknown"] for v in present_students.values())
 
-# 🎉 מצב 1 — כולם נוכחים ואין Unknown
-if len(known_present) == len(STUDENT_ROSTER) and not has_unknown:
-    st.success("🎉 Everyone is here!")
+    if len(known_present) == len(STUDENT_ROSTER) and not has_unknown:
+        st.success("🎉 Everyone is here!")
+        play_autoplay_sound(os.path.join(BASE_DIR, "3.mp3"))
+        emoji_rain("🎉", count=60)
 
-    # סאונד
-    play_autoplay_sound(os.path.join(BASE_DIR, "3.mp3"))
-
-    # קונפטי שמח
-    emoji_rain("🎉", count=60)
-
-# 🚨 מצב 2 — יש Unknown (ללא סאונד!)
-elif has_unknown:
-    st.markdown("""
-    <div style="background:#ff8c0015;border:1.5px solid #ff8c0050;border-radius:12px;
-        padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
-        <span class="material-symbols-outlined" style="color:#ff8c00;font-size:24px;">warning</span>
-        <div>
-            <div style="font-weight:700;color:#c45a00;font-size:14px;">Unidentified person detected!</div>
-            <div style="color:#b07040;font-size:12px;">Someone in the photo is not in the class roster.</div>
+    elif has_unknown:
+        st.markdown("""
+        <div style="background:#ff8c0015;border:1.5px solid #ff8c0050;border-radius:12px;
+            padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
+            <span class="material-symbols-outlined" style="color:#ff8c00;font-size:24px;">warning</span>
+            <div>
+                <div style="font-weight:700;color:#c45a00;font-size:14px;">Unidentified person detected!</div>
+                <div style="color:#b07040;font-size:12px;">Someone in the photo is not in the class roster.</div>
+            </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+        emoji_rain("⚠️", count=50)
 
-    # קונפטי אזהרה
-    emoji_rain("⚠️", count=50)
+    # ============================
+    # ⭐ התראה על היעדרות כרונית
+    # ============================
 
-# 😐 מצב 3 — יש חסרים אבל אין Unknown
-else:
-    pass  # בלי סאונד ובלי קונפטי
-
-
-# ============================
-# ⭐ התראה על היעדרות כרונית
-# ============================
-
-chronic_absent = [s for s in missing if updated_absences.get(s, 0) >= ABSENCE_THRESHOLD]
-if chronic_absent:
-    names = ", ".join(chronic_absent)
-    st.markdown(f"""
-    <div style="background:#c4605a15;border:1.5px solid #c4605a50;border-radius:12px;
-        padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
-        <span class="material-symbols-outlined" style="color:#c4605a;font-size:24px;">notification_important</span>
-        <div>
-            <div style="font-weight:700;color:#a03030;font-size:14px;">Chronic absence alert!</div>
-            <div style="color:#904040;font-size:12px;">{names} have been absent {ABSENCE_THRESHOLD}+ times.</div>
+    chronic_absent = [s for s in missing if updated_absences.get(s, 0) >= ABSENCE_THRESHOLD]
+    if chronic_absent:
+        names = ", ".join(chronic_absent)
+        st.markdown(f"""
+        <div style="background:#c4605a15;border:1.5px solid #c4605a50;border-radius:12px;
+            padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
+            <span class="material-symbols-outlined" style="color:#c4605a;font-size:24px;">notification_important</span>
+            <div>
+                <div style="font-weight:700;color:#a03030;font-size:14px;">Chronic absence alert!</div>
+                <div style="color:#904040;font-size:12px;">{names} have been absent {ABSENCE_THRESHOLD}+ times.</div>
+            </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
+    # ============================
+    # ⭐ נוכחים
+    # ============================
 
-# ============================
-# ⭐ נוכחים
-# ============================
+    st.markdown(
+        '<div class="section-divider"><div class="divider-line"></div>'
+        '<span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span> Present</span>'
+        '<div class="divider-line"></div></div>',
+        unsafe_allow_html=True
+    )
 
-st.markdown(
-    '<div class="section-divider"><div class="divider-line"></div>'
-    '<span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span> Present</span>'
-    '<div class="divider-line"></div></div>',
-    unsafe_allow_html=True
-)
+    if present_students:
+        cols = st.columns(5)
+        for i, (name, data) in enumerate(present_students.items()):
+            with cols[i % 5]:
+                st.image(data["img"], width=110)
+                if data["unknown"]:
+                    st.markdown('<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;">{name}</div>', unsafe_allow_html=True)
 
-if present_students:
-    cols = st.columns(5)
+    # ============================
+    # ⭐ חסרים
+    # ============================
 
-    for i, (name, data) in enumerate(present_students.items()):
-        with cols[i % 5]:
-            st.markdown('<div class="student-card">', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-divider"><div class="divider-line"></div>'
+        '<span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span> Absent</span>'
+        '<div class="divider-line"></div></div>',
+        unsafe_allow_html=True
+    )
 
-            # תמונת הזיהוי מהסריקה
-            st.image(data["img"], width=110)
+    if missing:
+        cols = st.columns(5)
+        for i, name in enumerate(missing):
+            with cols[i % 5]:
+                st.markdown(f'<div style="text-align:center;color:#c4605a;font-weight:600;font-size:13px;">{name}</div>', unsafe_allow_html=True)
+    else:
+        st.success("Everyone's here today!")
 
-            if data["unknown"]:
-                st.markdown(
-                    '<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div>'
-                    '<div style="text-align:center;color:#b07040;font-size:11px;">Not in roster</div>',
-                    unsafe_allow_html=True
-                )
-            else:
-                # תמונה קטנה להשוואה
-                if name in reference_photos:
-                    small = reference_photos[name].copy()
-                    small.thumbnail((55, 55))
-
-                    st.markdown(
-                        '<div style="border-top:1px dashed #e4dff0;margin-top:6px;padding-top:4px;'
-                        'display:flex;align-items:center;gap:6px;justify-content:center;">'
-                        '<span style="font-size:9px;color:#a098b8;">📎 ref</span>'
-                        '</div>',
-                        unsafe_allow_html=True
-                    )
-                    st.image(small, width=55)
-
-                st.markdown(
-                    f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;margin-top:4px;">{name}</div>',
-                    unsafe_allow_html=True
-                )
-
-            st.markdown('</div>', unsafe_allow_html=True)
-
-
-# ============================
-# ⭐ חסרים
-# ============================
-
-st.markdown(
-    '<div class="section-divider"><div class="divider-line"></div>'
-    '<span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span> Absent</span>'
-    '<div class="divider-line"></div></div>',
-    unsafe_allow_html=True
-)
-
-if missing:
-    cols = st.columns(5)
-
-    for i, name in enumerate(missing):
-        with cols[i % 5]:
-            st.markdown('<div class="student-card">', unsafe_allow_html=True)
-
-            # תמונה קטנה של התלמיד החסר
-            if name in reference_photos:
-                small = reference_photos[name].copy()
-                small.thumbnail((100, 100))
-                st.image(small, width=100)
-
-            # מונה היעדרויות
-            absence_count = updated_absences.get(name, 0)
-            color = "#a03030" if absence_count >= ABSENCE_THRESHOLD else "#c4605a"
-            badge = (
-                f'<span style="font-size:10px;background:#c4605a20;padding:2px 6px;border-radius:10px;">{absence_count}x</span>'
-                if absence_count > 0 else ''
-            )
-
-            st.markdown(
-                f'<div style="text-align:center;color:{color};font-weight:600;font-size:13px;">{name} {badge}</div>',
-                unsafe_allow_html=True
-            )
-
-            st.markdown('</div>', unsafe_allow_html=True)
-else:
-    st.success("Everyone's here today!")
 
 
 # ---- Mode content ----
