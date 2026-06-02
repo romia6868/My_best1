@@ -75,30 +75,27 @@ ABSENCE_THRESHOLD = 3
 SIAMESE_WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "my_siamese3_weights.weights.h5")
 SIAMESE_THRESHOLD = 0.49  # Best Threshold (95% Recall)
 
-
+version = int(time.time())  # מספר גרסה משתנה בכל טעינה
 css = """
 <!-- פונט כללי לאפליקציה -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Edu+VIC+WA+NT+Hand+Pre:wght@400..700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&display=swap">
 
 <!-- פונט לכותרת Smart Attendance -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee+Shade&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libertinus+Keyboard&display=swap">
 
 <!-- אייקונים -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
 
 <style>
 
-/* ⭐ כל האפליקציה משתמשת בפונט Edu VIC WA NT Hand Pre */
-* {
-    font-family: "Edu VIC WA NT Hand Pre", cursive !important;
-    font-optical-sizing: auto;
-    font-weight: 400;
-    font-style: normal;
+/* ⭐ כל האפליקציה בפונט Cinzel */
+body, * {
+    font-family: "Cinzel", serif;
 }
 
-/* ⭐ רק הכותרת Smart Attendance בפונט Bungee Shade */
+/* ⭐ רק הכותרת Smart Attendance בפונט Libertinus Keyboard */
 .bungee-title {
-    font-family: "Bungee Shade", sans-serif !important;
+    font-family: "Libertinus Keyboard", system-ui !important;
     font-weight: 400;
     font-style: normal;
 }
@@ -233,42 +230,10 @@ css = """
 }
 .model-badge-deepface { background: #9585b020; color: #9585b0; border: 1px solid #9585b040; }
 .model-badge-siamese { background: #68b88a20; color: #68b88a; border: 1px solid #68b88a40; }
+
 </style>
 """
 
-button_css = """
-<style>
-.stButton > button {
-    background: #ebe8f2 !important; color: #4a3a6a !important;
-    border: 1.5px solid #e4dff0 !important; border-radius: 10px !important;
-    padding: 11px 16px !important; font-size: 14px !important;
-    font-weight: 500 !important; width: 100% !important;
-    transition: all 0.2s !important;
-    font-family: 'Space Grotesk', sans-serif !important; margin-top: 0 !important;
-}
-.stButton > button:hover {
-    border-color: #9585b0 !important; transform: translateY(-2px) !important;
-    box-shadow: 0 4px 12px #b8a9c930 !important;
-}
-.stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, #b8a9c9, #9585b0) !important;
-    color: white !important; border: none !important;
-    box-shadow: 0 4px 14px #b8a9c940 !important;
-    padding: 13px 28px !important; font-size: 15px !important;
-    font-weight: 600 !important; margin-top: 12px !important;
-}
-.stButton > button[kind="primary"]:hover {
-    filter: brightness(1.08) !important; transform: translateY(-2px) !important;
-}
-.stDownloadButton > button {
-    background: #ebe8f2 !important; color: #9585b0 !important;
-    border: 1.5px solid #b8a9c9 !important; border-radius: 10px !important;
-    font-size: 13px !important; font-weight: 600 !important;
-    width: 100% !important; transition: all 0.2s !important; margin-top: 8px !important;
-}
-.stDownloadButton > button:hover { background: #e4dff0 !important; transform: translateY(-1px) !important; }
-</style>
-"""
 
 st.markdown(css, unsafe_allow_html=True)
 st.markdown(button_css, unsafe_allow_html=True)
@@ -802,6 +767,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         and siamese_model is not None
     )
 
+    # --- אנימציית סריקה ---
     scan_placeholder = st.empty()
     scan_placeholder.markdown("""
     <div class="scan-container">
@@ -818,6 +784,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     progress.progress(30, text="Analyzing faces...")
     scan_placeholder.empty()
 
+    # --- בחירת מודל ---
     if use_siamese:
         st.markdown('<div class="model-badge model-badge-siamese"><span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> Using: My Siamese Network</div>', unsafe_allow_html=True)
         active_embeddings = siamese_embeddings
@@ -831,6 +798,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     recognized_faces = []
     total = max(len(faces), 1)
 
+    # --- זיהוי פנים ---
     for i, data in enumerate(faces):
         img = data["face"]
         box = data["box"]
@@ -848,7 +816,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                 )
                 emb = np.array(result[0]["embedding"])
                 emb = emb / np.linalg.norm(emb)
-        except Exception as e:
+        except:
             continue
 
         if not active_embeddings:
@@ -868,9 +836,8 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         best_name, best_dist = min(distances.items(), key=lambda x: x[1])
 
         if best_dist <= active_threshold:
-            if best_name not in present_students:
-                present_students[best_name] = {"img": img, "unknown": False}
-                recognized_faces.append({"name": best_name, "box": box, "dist": best_dist, "unknown": False})
+            present_students[best_name] = {"img": img, "unknown": False}
+            recognized_faces.append({"name": best_name, "box": box, "dist": best_dist, "unknown": False})
         else:
             unknown_key = f"Unknown_{i}"
             present_students[unknown_key] = {"img": img, "unknown": True}
@@ -881,8 +848,10 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
     st.markdown(f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;">{len(faces)} faces detected</p>', unsafe_allow_html=True)
 
+    # --- ציור תיבות ---
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
+
     font_name = font_conf = None
     for path in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
                  "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]:
@@ -907,6 +876,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
     st.image(img_draw, use_column_width=True)
 
+    # --- חישוב נוכחות ---
     known_present = {k: v for k, v in present_students.items() if not v["unknown"]}
     missing = [s for s in STUDENT_ROSTER if s not in known_present]
     attendance_pct = int(len(known_present) / max(len(STUDENT_ROSTER), 1) * 100)
@@ -919,46 +889,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         "date": date_str
     }
 
-    all_students = os.listdir(REFERENCE_DIR)
-    if len(known_present) == len(all_students):
-        st.success("🎉 Everyone is here!")
-        audio_path = os.path.join(BASE_DIR, "3.mp3")
-        if os.path.exists(audio_path):
-            with open(audio_path, "rb") as f:
-                audio_bytes = f.read()
-            import base64
-            audio_b64 = base64.b64encode(audio_bytes).decode()
-            st.markdown(
-                f'<audio autoplay controls style="width:100%;margin-top:8px;">'
-                f'<source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">'
-                f'</audio>',
-                unsafe_allow_html=True
-            )
-        
-            st.markdown(f"""
-            <div class="stat-row">
-                <div class="stat-card">
-                    <div class="stat-label"><span class="material-symbols-outlined" style="color:#7a9e6a;">check_circle</span>Present</div>
-                    <div class="stat-val stat-green">{len(known_present)}</div>
-                    <div class="stat-sub">out of {len(STUDENT_ROSTER)}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label"><span class="material-symbols-outlined" style="color:#c4605a;">cancel</span>Absent</div>
-                    <div class="stat-val stat-red">{len(missing)}</div>
-                    <div class="stat-sub">check required</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label"><span class="material-symbols-outlined" style="color:#d4a853;">insights</span>Attendance</div>
-                    <div class="stat-val stat-gold">{attendance_pct}%</div>
-                    <div class="stat-sub">today</div>
-                </div>
-            </div>
-            <div class="progress-container">
-                <div class="progress-bar" style="width:{attendance_pct}%"></div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # --- התראה על היעדרות כרונית ---
     # --- התראה על היעדרות כרונית ---
     chronic_absent = [s for s in missing if updated_absences.get(s, 0) >= ABSENCE_THRESHOLD]
     if chronic_absent:
@@ -989,7 +919,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         """, unsafe_allow_html=True)
 
     # ============================
-    # ⭐ לוגיקת UX חכמה (קונפטי + סאונד)
+    # ⭐ UX חכם (קונפטי + סאונד)
     # ============================
 
     # 🎯 מצב 1 — כולם נוכחים ואין Unknown
