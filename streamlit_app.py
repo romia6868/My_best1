@@ -902,11 +902,9 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
     # --- בחירת מודל ---
     if use_siamese:
-        st.markdown('<div class="model-badge model-badge-siamese"><span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> Using: My Siamese Network</div>', unsafe_allow_html=True)
         active_embeddings = siamese_embeddings
         active_threshold = SIAMESE_THRESHOLD
     else:
-        st.markdown('<div class="model-badge model-badge-deepface"><span class="material-symbols-outlined" style="font-size:14px;">hub</span> Using: DeepFace Facenet512</div>', unsafe_allow_html=True)
         active_embeddings = reference_embeddings
         active_threshold = threshold
 
@@ -952,37 +950,25 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         best_name, best_dist = min(distances.items(), key=lambda x: x[1])
 
         if best_dist <= active_threshold:
-            if best_name not in present_students:
-                present_students[best_name] = {"img": img, "unknown": False}
-                recognized_faces.append({"name": best_name, "box": box, "dist": best_dist, "unknown": False})
+            present_students[best_name] = {"img": img, "unknown": False}
+            recognized_faces.append({"name": best_name, "box": box, "dist": best_dist, "unknown": False})
         else:
-            unknown_key = f"Unknown_{i}"
-            present_students[unknown_key] = {"img": img, "unknown": True}
+            present_students[f"Unknown_{i}"] = {"img": img, "unknown": True}
             recognized_faces.append({"name": "Unknown", "box": box, "dist": best_dist, "unknown": True})
 
     progress.progress(100, text="Done!")
     progress.empty()
 
-    st.markdown(f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;">{len(faces)} faces detected</p>', unsafe_allow_html=True)
-
     # --- ציור על התמונה ---
-    img_draw = Image.fromarray(original_img_rgb)
+    img_draw = Image.fromarray(original_img_rgb).convert("RGBA")
     draw = ImageDraw.Draw(img_draw)
 
     # --- פונט גדול וברור ---
-    font_name = None
-    font_conf = None
-
     font_paths = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
     ]
-
-    selected_font_path = None
-    for path in font_paths:
-        if os.path.exists(path):
-            selected_font_path = path
-            break
+    selected_font_path = next((p for p in font_paths if os.path.exists(p)), None)
 
     if selected_font_path:
         font_name = ImageFont.truetype(selected_font_path, 48)
@@ -1002,7 +988,8 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             draw.rectangle([x, y, x+w, y+h], outline=(220, 100, 30), width=4)
 
             overlay_draw.rectangle([x, y-55, x+w, y-5], fill=(0, 0, 0, 140))
-            img_draw = Image.alpha_composite(img_draw.convert("RGBA"), overlay)
+            img_draw = Image.alpha_composite(img_draw, overlay)
+            draw = ImageDraw.Draw(img_draw)  # ← חובה!
 
             draw.text((x+5, y-50), "Unknown", fill=(255, 180, 80), font=font_name)
 
@@ -1014,7 +1001,8 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             draw.rectangle([x, y, x+w, y+h], outline=(201, 149, 102), width=4)
 
             overlay_draw.rectangle([x, y-70, x+w, y-10], fill=(0, 0, 0, 140))
-            img_draw = Image.alpha_composite(img_draw.convert("RGBA"), overlay)
+            img_draw = Image.alpha_composite(img_draw, overlay)
+            draw = ImageDraw.Draw(img_draw)  # ← חובה!
 
             draw.text((x+5, y-65), face["name"], fill=(255, 230, 180), font=font_name)
             draw.text((x+5, y-30), f"{pct}%", fill=(255, 210, 120), font=font_conf)
@@ -1024,7 +1012,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     # --- חישובי נוכחות ---
     known_present = {k: v for k, v in present_students.items() if not v["unknown"]}
     missing = [s for s in STUDENT_ROSTER if s not in known_present]
-    attendance_pct = int(len(known_present) / max(len(STUDENT_ROSTER), 1) * 100)
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     updated_absences = update_absences(missing)
@@ -1033,42 +1020,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         "missing": missing,
         "date": date_str
     }
-
-    # --- סטטיסטיקות + קונפטי ---
-    has_unknown = any(v["unknown"] for v in present_students.values())
-
-    if len(known_present) == len(STUDENT_ROSTER) and not has_unknown:
-        st.success("🎉 Everyone is here!")
-        play_autoplay_sound(os.path.join(BASE_DIR, "3.mp3"))
-        emoji_rain("🎉", count=60)
-
-    elif has_unknown:
-        st.markdown("""
-        <div style="background:#ff8c0015;border:1.5px solid #ff8c0050;border-radius:12px;
-            padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
-            <span class="material-symbols-outlined" style="color:#ff8c00;font-size:24px;">warning</span>
-            <div>
-                <div style="font-weight:700;color:#c45a00;font-size:14px;">Unidentified person detected!</div>
-                <div style="color:#b07040;font-size:12px;">Someone in the photo is not in the class roster.</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        emoji_rain("⚠️", count=50)
-
-    # --- התראה על היעדרות כרונית ---
-    chronic_absent = [s for s in missing if updated_absences.get(s, 0) >= ABSENCE_THRESHOLD]
-    if chronic_absent:
-        names = ", ".join(chronic_absent)
-        st.markdown(f"""
-        <div style="background:#c4605a15;border:1.5px solid #c4605a50;border-radius:12px;
-            padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
-            <span class="material-symbols-outlined" style="color:#c4605a;font-size:24px;">notification_important</span>
-            <div>
-                <div style="font-weight:700;color:#a03030;font-size:14px;">Chronic absence alert!</div>
-                <div style="color:#904040;font-size:12px;">{names} have been absent {ABSENCE_THRESHOLD}+ times.</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
 
     # --- נוכחים ---
     st.markdown(
@@ -1080,39 +1031,19 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
     if present_students:
         cols = st.columns(5)
-
         for i, (name, data) in enumerate(present_students.items()):
             with cols[i % 5]:
-                st.markdown('<div class="student-card">', unsafe_allow_html=True)
-
                 st.image(data["img"], width=110)
 
                 if data["unknown"]:
-                    st.markdown(
-                        '<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div>'
-                        '<div style="text-align:center;color:#b07040;font-size:11px;">Not in roster</div>',
-                        unsafe_allow_html=True
-                    )
+                    st.markdown('<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div>', unsafe_allow_html=True)
                 else:
                     if name in reference_photos:
                         small = reference_photos[name].copy()
                         small.thumbnail((55, 55))
-
-                        st.markdown(
-                            '<div style="border-top:1px dashed #e4dff0;margin-top:6px;padding-top:4px;'
-                            'display:flex;align-items:center;gap:6px;justify-content:center;">'
-                            '<span style="font-size:9px;color:#a098b8;">📎 ref</span>'
-                            '</div>',
-                            unsafe_allow_html=True
-                        )
                         st.image(small, width=55)
 
-                    st.markdown(
-                        f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;margin-top:4px;">{name}</div>',
-                        unsafe_allow_html=True
-                    )
-
-                st.markdown('</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;">{name}</div>', unsafe_allow_html=True)
 
     # --- חסרים ---
     st.markdown(
