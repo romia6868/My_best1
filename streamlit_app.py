@@ -75,7 +75,6 @@ ABSENCE_THRESHOLD = 3
 SIAMESE_WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "my_siamese3_weights.weights.h5")
 SIAMESE_THRESHOLD = 0.49  # Best Threshold (95% Recall)
 
-version = int(time.time())  # מספר גרסה משתנה בכל טעינה
 css = """
 <!-- פונט כללי לאפליקציה -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&display=swap">
