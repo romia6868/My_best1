@@ -1133,6 +1133,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
 
 
+
 # ---- Mode content ----
 if st.session_state.mode == "upload":
     st.markdown("""
