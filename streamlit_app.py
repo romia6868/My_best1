@@ -75,165 +75,176 @@ ABSENCE_THRESHOLD = 3
 SIAMESE_WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "my_siamese3_weights.weights.h5")
 SIAMESE_THRESHOLD = 0.49  # Best Threshold (95% Recall)
 
-import time
-import streamlit as st
-
-css_version = int(time.time())
-
-# טעינת הפונטים
-st.markdown(
-    f"""
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&display=swap&v={css_version}">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libertinus+Keyboard&display=swap&v={css_version}">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&v={css_version}">
-""",
-    unsafe_allow_html=True,
-)
 
 css = """
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"/>
 <style>
-
-/* כל האפליקציה בפונט Cinzel */
-html, body, [class*="css"], .stApp {
-    font-family: "Cinzel", serif !important;
-}
-
-/* כותרת */
-.bungee-title {
-    font-family: "Libertinus Keyboard", serif !important;
-    font-weight: 400;
-    font-style: normal;
-}
-
-/* אייקונים */
+* { font-family: 'Space Grotesk', sans-serif !important; }
 .material-symbols-outlined {
-    font-family: "Material Symbols Outlined" !important;
-    font-weight: normal;
-    font-style: normal;
-    font-size: 22px;
-    line-height: 1;
-    letter-spacing: normal;
-    text-transform: none;
-    display: inline-block;
-    white-space: nowrap;
-    -webkit-font-feature-settings: "liga";
-    font-feature-settings: "liga";
+    font-family: 'Material Symbols Outlined' !important;
+    font-weight: normal; font-style: normal; font-size: 22px;
+    line-height: 1; letter-spacing: normal; text-transform: none;
+    display: inline-block; white-space: nowrap;
+    -webkit-font-feature-settings: 'liga'; font-feature-settings: 'liga';
     -webkit-font-smoothing: antialiased;
 }
-
-/* רקע כללי */
-.stApp {
-    background: #f0eef4 !important;
+@keyframes pulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 #b8a9c940; }
+    50% { transform: scale(1.06); box-shadow: 0 0 0 8px #b8a9c900; }
 }
-
-/* Header */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+    0% { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+}
+@keyframes progressFill { from { width: 0%; } }
+@keyframes scanLine {
+    0% { top: 0%; opacity: 1; }
+    100% { top: 100%; opacity: 0.3; }
+}
+.stApp { background: #f0eef4 !important; }
 .main-header {
-    display: flex;
-    align-items: center;
-    gap: 14px;
+    display: flex; align-items: center; gap: 14px;
     padding: 1.5rem 0 1rem;
     border-bottom: 1px solid #e4dff0;
     margin-bottom: 1.5rem;
 }
-
 .header-icon {
-    width: 52px;
-    height: 52px;
+    width: 52px; height: 52px;
     background: linear-gradient(135deg, #b8a9c9, #9585b0);
     border-radius: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: flex; align-items: center; justify-content: center;
+    animation: pulse 3s ease-in-out infinite;
 }
-
-.header-icon .material-symbols-outlined {
-    font-size: 28px;
-    color: white;
-}
-
+.header-icon .material-symbols-outlined { font-size: 28px; color: white; }
 .header-title {
-    font-size: 28px;
-    font-weight: 700;
+    font-size: 28px; font-weight: 700;
     background: linear-gradient(90deg, #6b5a8a, #9585b0, #c4b8d8);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
-
-/* Sidebar */
-[data-testid="stSidebar"] {
-    background: #e8e4f0 !important;
-    border-right: 1px solid #e4dff0 !important;
+.scan-container { position: relative; display: inline-block; width: 100%; }
+.scan-overlay {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; z-index: 10; border-radius: 8px; overflow: hidden;
 }
-
-.sidebar-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: #4a3a6a;
-    margin-bottom: 1rem;
+.scan-line {
+    position: absolute; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent, #b8a9c9, #c4b8d8, #b8a9c9, transparent);
+    animation: scanLine 1.5s ease-in-out infinite;
+    box-shadow: 0 0 12px #b8a9c980;
 }
-
-.sidebar-student {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    background: #f0eef4;
-    border-radius: 8px;
-    margin-bottom: 6px;
-    font-size: 13px;
-    color: #4a3a6a;
-    border: 1px solid #e4dff0;
-}
-
-/* Upload */
 .upload-zone {
     border: 1.5px dashed #c4b8d8;
-    border-radius: 14px;
-    padding: 2.5rem;
-    text-align: center;
-    background: #ebe8f240;
+    border-radius: 14px; padding: 2.5rem;
+    text-align: center; background: #ebe8f240;
+    margin-bottom: 1rem; transition: all 0.2s;
+}
+.upload-zone:hover { border-color: #9585b0; background: #ebe8f260; }
+.upload-zone .material-symbols-outlined { font-size: 44px; color: #9585b0; }
+.upload-text { font-size: 15px; color: #4a3a6a; margin: 8px 0 4px; font-weight: 500; }
+.upload-sub { font-size: 12px; color: #a098b8; }
+.stat-row { display: flex; gap: 12px; margin: 1.5rem 0; }
+.stat-card {
+    flex: 1; background: #fff;
+    border: 1px solid #e4dff0;
+    border-radius: 12px; padding: 16px 18px;
+    transition: all 0.2s; position: relative; overflow: hidden;
+}
+.stat-card::after {
+    content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, #ebe8f230, transparent);
+    background-size: 400px 100%; animation: shimmer 2.5s infinite;
+}
+.stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px #b8a9c920; border-color: #c4b8d8; }
+.stat-label {
+    font-size: 11px; color: #a098b8; text-transform: uppercase; letter-spacing: 0.5px;
+    display: flex; align-items: center; gap: 5px; margin-bottom: 6px;
+}
+.stat-label .material-symbols-outlined { font-size: 14px; }
+.stat-val { font-size: 28px; font-weight: 700; }
+.stat-sub { font-size: 11px; color: #c4b8d8; margin-top: 3px; }
+.stat-green { color: #68b88a; }
+.stat-red { color: #d4707a; }
+.stat-gold { background: linear-gradient(90deg,#6b5a8a,#b8a9c9); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.progress-container { background: #ebe8f2; border-radius: 8px; height: 6px; margin: 8px 0 16px; overflow: hidden; }
+.progress-bar { height: 100%; background: linear-gradient(90deg, #b8a9c9, #c4b8d8); border-radius: 8px; animation: progressFill 1.5s ease-out forwards; }
+.section-divider { display: flex; align-items: center; gap: 12px; margin: 1.8rem 0 1.2rem; }
+.divider-line { flex: 1; height: 1px; background: #e4dff0; }
+.divider-badge { font-size: 12px; padding: 4px 14px; border-radius: 20px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+.divider-badge .material-symbols-outlined { font-size: 15px; }
+.badge-present { background: #68b88a20; color: #68b88a; }
+.badge-absent { background: #d4707a20; color: #d4707a; }
+.badge-unknown { background: #e8a85020; color: #e8a850; }
+.student-card { animation: fadeInUp 0.4s ease both; text-align: center; }
+.student-card:nth-child(1) { animation-delay: 0.05s; }
+.student-card:nth-child(2) { animation-delay: 0.10s; }
+.student-card:nth-child(3) { animation-delay: 0.15s; }
+.student-card:nth-child(4) { animation-delay: 0.20s; }
+.student-card:nth-child(5) { animation-delay: 0.25s; }
+[data-testid="stSidebar"] { background: #e8e4f0 !important; border-right: 1px solid #e4dff0 !important; }
+.sidebar-title { font-size: 15px; font-weight: 700; color: #4a3a6a; margin-bottom: 1rem; display: flex; align-items: center; gap: 6px; }
+.sidebar-title .material-symbols-outlined { font-size: 18px; color: #9585b0; }
+.sidebar-student {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; background: #f0eef4;
+    border-radius: 8px; margin-bottom: 6px;
+    font-size: 13px; color: #4a3a6a;
+    border: 1px solid #e4dff0;
+    transition: all 0.2s; cursor: default;
+}
+.sidebar-student:hover { border-color: #b8a9c9; transform: translateX(4px); box-shadow: 2px 0 8px #b8a9c920; }
+.sidebar-student .material-symbols-outlined { font-size: 16px; color: #9585b0; }
+.mode-desc { color: #a098b8; font-size: 14px; margin-bottom: 1rem; }
+.model-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
     margin-bottom: 1rem;
 }
+.model-badge-deepface { background: #9585b020; color: #9585b0; border: 1px solid #9585b040; }
+.model-badge-siamese { background: #68b88a20; color: #68b88a; border: 1px solid #68b88a40; }
+</style>
+"""
 
-.upload-zone:hover {
-    border-color: #9585b0;
+button_css = """
+<style>
+.stButton > button {
+    background: #ebe8f2 !important; color: #4a3a6a !important;
+    border: 1.5px solid #e4dff0 !important; border-radius: 10px !important;
+    padding: 11px 16px !important; font-size: 14px !important;
+    font-weight: 500 !important; width: 100% !important;
+    transition: all 0.2s !important;
+    font-family: 'Space Grotesk', sans-serif !important; margin-top: 0 !important;
 }
-
-/* Stats */
-.stat-card {
-    background: white;
-    border: 1px solid #e4dff0;
-    border-radius: 12px;
-    padding: 16px 18px;
+.stButton > button:hover {
+    border-color: #9585b0 !important; transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px #b8a9c930 !important;
 }
-
-.stat-val {
-    font-size: 28px;
-    font-weight: 700;
+.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #b8a9c9, #9585b0) !important;
+    color: white !important; border: none !important;
+    box-shadow: 0 4px 14px #b8a9c940 !important;
+    padding: 13px 28px !important; font-size: 15px !important;
+    font-weight: 600 !important; margin-top: 12px !important;
 }
-
-.stat-green {
-    color: #68b88a;
+.stButton > button[kind="primary"]:hover {
+    filter: brightness(1.08) !important; transform: translateY(-2px) !important;
 }
-
-.stat-red {
-    color: #d4707a;
+.stDownloadButton > button {
+    background: #ebe8f2 !important; color: #9585b0 !important;
+    border: 1.5px solid #b8a9c9 !important; border-radius: 10px !important;
+    font-size: 13px !important; font-weight: 600 !important;
+    width: 100% !important; transition: all 0.2s !important; margin-top: 8px !important;
 }
-
-.stat-gold {
-    color: #6b5a8a;
-}
-
+.stDownloadButton > button:hover { background: #e4dff0 !important; transform: translateY(-1px) !important; }
 </style>
 """
 
 st.markdown(css, unsafe_allow_html=True)
-
-# אם קיים CSS נוסף לכפתורים
-try:
-    st.markdown(button_css, unsafe_allow_html=True)
-except NameError:
-    pass
+st.markdown(button_css, unsafe_allow_html=True)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ZIP_PATH = os.path.join(BASE_DIR, "My_Classmates_small.zip")
@@ -764,7 +775,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         and siamese_model is not None
     )
 
-    # --- אנימציית סריקה ---
     scan_placeholder = st.empty()
     scan_placeholder.markdown("""
     <div class="scan-container">
@@ -781,7 +791,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     progress.progress(30, text="Analyzing faces...")
     scan_placeholder.empty()
 
-    # --- בחירת מודל ---
     if use_siamese:
         st.markdown('<div class="model-badge model-badge-siamese"><span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> Using: My Siamese Network</div>', unsafe_allow_html=True)
         active_embeddings = siamese_embeddings
@@ -795,7 +804,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     recognized_faces = []
     total = max(len(faces), 1)
 
-    # --- זיהוי פנים ---
     for i, data in enumerate(faces):
         img = data["face"]
         box = data["box"]
@@ -813,7 +821,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                 )
                 emb = np.array(result[0]["embedding"])
                 emb = emb / np.linalg.norm(emb)
-        except:
+        except Exception as e:
             continue
 
         if not active_embeddings:
@@ -833,8 +841,9 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         best_name, best_dist = min(distances.items(), key=lambda x: x[1])
 
         if best_dist <= active_threshold:
-            present_students[best_name] = {"img": img, "unknown": False}
-            recognized_faces.append({"name": best_name, "box": box, "dist": best_dist, "unknown": False})
+            if best_name not in present_students:
+                present_students[best_name] = {"img": img, "unknown": False}
+                recognized_faces.append({"name": best_name, "box": box, "dist": best_dist, "unknown": False})
         else:
             unknown_key = f"Unknown_{i}"
             present_students[unknown_key] = {"img": img, "unknown": True}
@@ -845,10 +854,8 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
     st.markdown(f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;">{len(faces)} faces detected</p>', unsafe_allow_html=True)
 
-    # --- ציור תיבות ---
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
-
     font_name = font_conf = None
     for path in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
                  "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]:
@@ -873,7 +880,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
     st.image(img_draw, use_column_width=True)
 
-    # --- חישוב נוכחות ---
     known_present = {k: v for k, v in present_students.items() if not v["unknown"]}
     missing = [s for s in STUDENT_ROSTER if s not in known_present]
     attendance_pct = int(len(known_present) / max(len(STUDENT_ROSTER), 1) * 100)
@@ -886,133 +892,185 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         "date": date_str
     }
 
-    # --- התראה על היעדרות כרונית ---
-    chronic_absent = [s for s in missing if updated_absences.get(s, 0) >= ABSENCE_THRESHOLD]
-    if chronic_absent:
-        names = ", ".join(chronic_absent)
-        st.markdown(f"""
-        <div style="background:#c4605a15;border:1.5px solid #c4605a50;border-radius:12px;
-            padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
-            <span class="material-symbols-outlined" style="color:#c4605a;font-size:24px;">notification_important</span>
-            <div>
-                <div style="font-weight:700;color:#a03030;font-size:14px;">Chronic absence alert!</div>
-                <div style="color:#904040;font-size:12px;">{names} have been absent {ABSENCE_THRESHOLD}+ times.</div>
+    all_students = os.listdir(REFERENCE_DIR)
+    if len(known_present) == len(all_students):
+        st.success("🎉 Everyone is here!")
+        audio_path = os.path.join(BASE_DIR, "3.mp3")
+        if os.path.exists(audio_path):
+            with open(audio_path, "rb") as f:
+                audio_bytes = f.read()
+            import base64
+            audio_b64 = base64.b64encode(audio_bytes).decode()
+            st.markdown(
+                f'<audio autoplay controls style="width:100%;margin-top:8px;">'
+                f'<source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">'
+                f'</audio>',
+                unsafe_allow_html=True
+            )
+        
+            st.markdown(f"""
+            <div class="stat-row">
+                <div class="stat-card">
+                    <div class="stat-label"><span class="material-symbols-outlined" style="color:#7a9e6a;">check_circle</span>Present</div>
+                    <div class="stat-val stat-green">{len(known_present)}</div>
+                    <div class="stat-sub">out of {len(STUDENT_ROSTER)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label"><span class="material-symbols-outlined" style="color:#c4605a;">cancel</span>Absent</div>
+                    <div class="stat-val stat-red">{len(missing)}</div>
+                    <div class="stat-sub">check required</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label"><span class="material-symbols-outlined" style="color:#d4a853;">insights</span>Attendance</div>
+                    <div class="stat-val stat-gold">{attendance_pct}%</div>
+                    <div class="stat-sub">today</div>
+                </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # --- התראה על Unknown ---
-    has_unknown = any(v["unknown"] for v in present_students.values())
-    if has_unknown:
-        st.markdown("""
-        <div style="background:#ff8c0015;border:1.5px solid #ff8c0050;border-radius:12px;
-            padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
-            <span class="material-symbols-outlined" style="color:#ff8c00;font-size:24px;">warning</span>
-            <div>
-                <div style="font-weight:700;color:#c45a00;font-size:14px;">Unidentified person detected!</div>
-                <div style="color:#b07040;font-size:12px;">Someone in the photo is not in the class roster.</div>
+            <div class="progress-container">
+                <div class="progress-bar" style="width:{attendance_pct}%"></div>
             </div>
+            """, unsafe_allow_html=True)
+        
+        # --- התראה על היעדרות כרונית ---
+       # --- התראה על היעדרות כרונית ---
+chronic_absent = [s for s in missing if updated_absences.get(s, 0) >= ABSENCE_THRESHOLD]
+if chronic_absent:
+    names = ", ".join(chronic_absent)
+    st.markdown(f"""
+    <div style="background:#c4605a15;border:1.5px solid #c4605a50;border-radius:12px;
+        padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
+        <span class="material-symbols-outlined" style="color:#c4605a;font-size:24px;">notification_important</span>
+        <div>
+            <div style="font-weight:700;color:#a03030;font-size:14px;">Chronic absence alert!</div>
+            <div style="color:#904040;font-size:12px;">{names} have been absent {ABSENCE_THRESHOLD}+ times.</div>
         </div>
-        """, unsafe_allow_html=True)
+    </div>
+    """, unsafe_allow_html=True)
 
-    # ============================
-    # ⭐ UX חכם (קונפטי + סאונד)
-    # ============================
 
-    # 🎯 מצב 1 — כולם נוכחים ואין Unknown
-    if len(known_present) == len(STUDENT_ROSTER) and not has_unknown:
-        play_autoplay_sound(os.path.join(BASE_DIR, "3.mp3"))
-        emoji_confetti("🎉")
+# --- התראה על Unknown ---
+has_unknown = any(v["unknown"] for v in present_students.values())
+if has_unknown:
+    st.markdown("""
+    <div style="background:#ff8c0015;border:1.5px solid #ff8c0050;border-radius:12px;
+        padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;">
+        <span class="material-symbols-outlined" style="color:#ff8c00;font-size:24px;">warning</span>
+        <div>
+            <div style="font-weight:700;color:#c45a00;font-size:14px;">Unidentified person detected!</div>
+            <div style="color:#b07040;font-size:12px;">Someone in the photo is not in the class roster.</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    # 🚨 מצב 2 — יש Unknown
-    elif has_unknown:
-        emoji_confetti("🚨")
 
-    # 😐 מצב 3 — יש חסרים אבל אין Unknown
-    else:
-        pass
+# ============================
+# ⭐ לוגיקת UX חכמה (קונפטי + סאונד)
+# ============================
 
-    # ============================
-    # ⭐ נוכחים
-    # ============================
+# 🎯 מצב 1 — כולם נוכחים ואין Unknown
+if len(known_present) == len(STUDENT_ROSTER) and not has_unknown:
+    play_autoplay_sound(os.path.join(BASE_DIR, "3.mp3"))
+    emoji_confetti("🎉")   # קונפטי שמח
 
-    st.markdown(
-        '<div class="section-divider"><div class="divider-line"></div>'
-        '<span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span> Present</span>'
-        '<div class="divider-line"></div></div>',
-        unsafe_allow_html=True
-    )
+# 🚨 מצב 2 — יש Unknown
+elif has_unknown:
+    emoji_confetti("🚨")   # קונפטי אזהרה
 
-    if present_students:
-        cols = st.columns(5)
-        for i, (name, data) in enumerate(present_students.items()):
-            with cols[i % 5]:
-                st.markdown('<div class="student-card">', unsafe_allow_html=True)
-                st.image(data["img"], width=110)
+# 😐 מצב 3 — יש חסרים אבל אין Unknown
+else:
+    pass  # בלי קונפטי ובלי סאונד
 
-                if data["unknown"]:
-                    st.markdown(
-                        '<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div>'
-                        '<div style="text-align:center;color:#b07040;font-size:11px;">Not in roster</div>',
-                        unsafe_allow_html=True
-                    )
-                else:
-                    if name in reference_photos:
-                        small = reference_photos[name].copy()
-                        small.thumbnail((55, 55))
-                        st.markdown(
-                            '<div style="border-top:1px dashed #e4dff0;margin-top:6px;padding-top:4px;'
-                            'display:flex;align-items:center;gap:6px;justify-content:center;">'
-                            '<span style="font-size:9px;color:#a098b8;">📎 ref</span>'
-                            '</div>',
-                            unsafe_allow_html=True
-                        )
-                        st.image(small, width=55)
 
-                    st.markdown(
-                        f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;margin-top:4px;">{name}</div>',
-                        unsafe_allow_html=True
-                    )
+# ============================
+# ⭐ נוכחים
+# ============================
 
-                st.markdown('</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="section-divider"><div class="divider-line"></div>'
+    '<span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span> Present</span>'
+    '<div class="divider-line"></div></div>',
+    unsafe_allow_html=True
+)
 
-    # ============================
-    # ⭐ חסרים
-    # ============================
+if present_students:
+    cols = st.columns(5)
 
-    st.markdown(
-        '<div class="section-divider"><div class="divider-line"></div>'
-        '<span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span> Absent</span>'
-        '<div class="divider-line"></div></div>',
-        unsafe_allow_html=True
-    )
+    for i, (name, data) in enumerate(present_students.items()):
+        with cols[i % 5]:
+            st.markdown('<div class="student-card">', unsafe_allow_html=True)
 
-    if missing:
-        cols = st.columns(5)
-        for i, name in enumerate(missing):
-            with cols[i % 5]:
-                st.markdown('<div class="student-card">', unsafe_allow_html=True)
+            # תמונת הזיהוי מהסריקה
+            st.image(data["img"], width=110)
 
+            if data["unknown"]:
+                st.markdown(
+                    '<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div>'
+                    '<div style="text-align:center;color:#b07040;font-size:11px;">Not in roster</div>',
+                    unsafe_allow_html=True
+                )
+            else:
+                # תמונה קטנה להשוואה
                 if name in reference_photos:
                     small = reference_photos[name].copy()
-                    small.thumbnail((100, 100))
-                    st.image(small, width=100)
+                    small.thumbnail((55, 55))
 
-                absence_count = updated_absences.get(name, 0)
-                color = "#a03030" if absence_count >= ABSENCE_THRESHOLD else "#c4605a"
-                badge = (
-                    f'<span style="font-size:10px;background:#c4605a20;padding:2px 6px;border-radius:10px;">{absence_count}x</span>'
-                    if absence_count > 0 else ''
-                )
+                    st.markdown(
+                        '<div style="border-top:1px dashed #e4dff0;margin-top:6px;padding-top:4px;'
+                        'display:flex;align-items:center;gap:6px;justify-content:center;">'
+                        '<span style="font-size:9px;color:#a098b8;">📎 ref</span>'
+                        '</div>',
+                        unsafe_allow_html=True
+                    )
+                    st.image(small, width=55)
 
                 st.markdown(
-                    f'<div style="text-align:center;color:{color};font-weight:600;font-size:13px;">{name} {badge}</div>',
+                    f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;margin-top:4px;">{name}</div>',
                     unsafe_allow_html=True
                 )
 
-                st.markdown('</div>', unsafe_allow_html=True)
-    else:
-        st.success("Everyone's here today!")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ============================
+# ⭐ חסרים
+# ============================
+
+st.markdown(
+    '<div class="section-divider"><div class="divider-line"></div>'
+    '<span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span> Absent</span>'
+    '<div class="divider-line"></div></div>',
+    unsafe_allow_html=True
+)
+
+if missing:
+    cols = st.columns(5)
+
+    for i, name in enumerate(missing):
+        with cols[i % 5]:
+            st.markdown('<div class="student-card">', unsafe_allow_html=True)
+
+            # תמונה קטנה של התלמיד החסר
+            if name in reference_photos:
+                small = reference_photos[name].copy()
+                small.thumbnail((100, 100))
+                st.image(small, width=100)
+
+            # מונה היעדרויות
+            absence_count = updated_absences.get(name, 0)
+            color = "#a03030" if absence_count >= ABSENCE_THRESHOLD else "#c4605a"
+            badge = (
+                f'<span style="font-size:10px;background:#c4605a20;padding:2px 6px;border-radius:10px;">{absence_count}x</span>'
+                if absence_count > 0 else ''
+            )
+
+            st.markdown(
+                f'<div style="text-align:center;color:{color};font-weight:600;font-size:13px;">{name} {badge}</div>',
+                unsafe_allow_html=True
+            )
+
+            st.markdown('</div>', unsafe_allow_html=True)
+else:
+    st.success("Everyone's here today!")
 
 
 # ---- Mode content ----
