@@ -49,8 +49,6 @@ DeepFace = lazy_import_deepface()
 remove = lazy_import_rembg()
 
 
-
-
 # --- הגדרות Streamlit ---
 st.set_page_config(
     page_title="Smart Attendance",
@@ -252,10 +250,8 @@ button_css = """
 </style>
 """
 
-# הזרקת ה-CSS לתוך Streamlit
 st.markdown(css, unsafe_allow_html=True)
 st.markdown(button_css, unsafe_allow_html=True)
-
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ZIP_PATH = os.path.join(BASE_DIR, "My_Classmates_small.zip")
