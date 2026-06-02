@@ -960,37 +960,75 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
 
-    # --- פונט גדול וברור יותר ---
-font_name = ImageFont.truetype(path, 48)   # שם גדול
-font_conf = ImageFont.truetype(path, 32)   # אחוזים גדולים
+# ============================
+# ⭐ פונט גדול וברור יותר
+# ============================
+
+font_name = None
+font_conf = None
+
+# נתיבי פונטים אפשריים
+font_paths = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
+]
+
+# חיפוש פונט קיים
+selected_font_path = None
+for path in font_paths:
+    if os.path.exists(path):
+        selected_font_path = path
+        break
+
+# טעינת הפונט בגדלים גדולים (מחוץ ללולאה!)
+if selected_font_path:
+    font_name = ImageFont.truetype(selected_font_path, 48)   # שם גדול וברור
+    font_conf = ImageFont.truetype(selected_font_path, 32)   # אחוזים גדולים וברורים
+else:
+    font_name = ImageFont.load_default()
+    font_conf = ImageFont.load_default()
+
+
+# ============================
+# ⭐ ציור מסגרות + טקסט על הפנים
+# ============================
 
 for face in recognized_faces:
     x, y, w, h = face["box"]
 
-    # רקע כהה שקוף מאחורי הטקסט
-    overlay = Image.new("RGBA", img_draw.size, (0,0,0,0))
+    # שכבת רקע שקופה
+    overlay = Image.new("RGBA", img_draw.size, (0, 0, 0, 0))
     overlay_draw = ImageDraw.Draw(overlay)
 
     if face["unknown"]:
-        draw.rectangle([x, y, x+w, y+h], outline=(220,100,30), width=4)
+        # מסגרת כתומה
+        draw.rectangle([x, y, x+w, y+h], outline=(220, 100, 30), width=4)
 
-        # רקע לטקסט
-        overlay_draw.rectangle([x, y-55, x+w, y-5], fill=(0,0,0,140))
+        # רקע כהה לטקסט
+        overlay_draw.rectangle([x, y-55, x+w, y-5], fill=(0, 0, 0, 140))
         img_draw = Image.alpha_composite(img_draw.convert("RGBA"), overlay)
 
-        draw.text((x+5, y-50), "Unknown", fill=(255,180,80), font=font_name)
+        # טקסט Unknown
+        draw.text((x+5, y-50), "Unknown", fill=(255, 180, 80), font=font_name)
 
     else:
-        pct = int((1 - face["dist"]) * 100) if not use_siamese else int(max(0, (1 - face["dist"] / active_threshold)) * 100)
+        # חישוב אחוז התאמה
+        pct = int((1 - face["dist"]) * 100) if not use_siamese else int(
+            max(0, (1 - face["dist"] / active_threshold)) * 100
+        )
 
-        draw.rectangle([x, y, x+w, y+h], outline=(201,149,102), width=4)
+        # מסגרת זהובה
+        draw.rectangle([x, y, x+w, y+h], outline=(201, 149, 102), width=4)
 
-        # רקע לטקסט
-        overlay_draw.rectangle([x, y-70, x+w, y-10], fill=(0,0,0,140))
+        # רקע כהה לטקסט
+        overlay_draw.rectangle([x, y-70, x+w, y-10], fill=(0, 0, 0, 140))
         img_draw = Image.alpha_composite(img_draw.convert("RGBA"), overlay)
 
-        draw.text((x+5, y-65), face["name"], fill=(255,230,180), font=font_name)
-        draw.text((x+5, y-30), f"{pct}%", fill=(255,210,120), font=font_conf)
+        # שם התלמיד
+        draw.text((x+5, y-65), face["name"], fill=(255, 230, 180), font=font_name)
+
+        # אחוז התאמה
+        draw.text((x+5, y-30), f"{pct}%", fill=(255, 210, 120), font=font_conf)
 
 
     st.image(img_draw, use_column_width=True)
