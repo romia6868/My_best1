@@ -960,16 +960,38 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
 
-    for face in recognized_faces:
-        x, y, w, h = face["box"]
-        if face["unknown"]:
-            draw.rectangle([x, y, x+w, y+h], outline=(220,100,30), width=3)
-            draw.text((x, y-42), "Unknown", fill=(220,100,30))
-        else:
-            pct = int((1 - face["dist"]) * 100) if not use_siamese else int(max(0, (1 - face["dist"] / active_threshold)) * 100)
-            draw.rectangle([x, y, x+w, y+h], outline=(201,149,102), width=3)
-            draw.text((x, y-42), face["name"], fill=(181,120,74))
-            draw.text((x, y-20), f"{pct}%", fill=(212,168,83))
+    # --- פונט גדול וברור יותר ---
+font_name = ImageFont.truetype(path, 48)   # שם גדול
+font_conf = ImageFont.truetype(path, 32)   # אחוזים גדולים
+
+for face in recognized_faces:
+    x, y, w, h = face["box"]
+
+    # רקע כהה שקוף מאחורי הטקסט
+    overlay = Image.new("RGBA", img_draw.size, (0,0,0,0))
+    overlay_draw = ImageDraw.Draw(overlay)
+
+    if face["unknown"]:
+        draw.rectangle([x, y, x+w, y+h], outline=(220,100,30), width=4)
+
+        # רקע לטקסט
+        overlay_draw.rectangle([x, y-55, x+w, y-5], fill=(0,0,0,140))
+        img_draw = Image.alpha_composite(img_draw.convert("RGBA"), overlay)
+
+        draw.text((x+5, y-50), "Unknown", fill=(255,180,80), font=font_name)
+
+    else:
+        pct = int((1 - face["dist"]) * 100) if not use_siamese else int(max(0, (1 - face["dist"] / active_threshold)) * 100)
+
+        draw.rectangle([x, y, x+w, y+h], outline=(201,149,102), width=4)
+
+        # רקע לטקסט
+        overlay_draw.rectangle([x, y-70, x+w, y-10], fill=(0,0,0,140))
+        img_draw = Image.alpha_composite(img_draw.convert("RGBA"), overlay)
+
+        draw.text((x+5, y-65), face["name"], fill=(255,230,180), font=font_name)
+        draw.text((x+5, y-30), f"{pct}%", fill=(255,210,120), font=font_conf)
+
 
     st.image(img_draw, use_column_width=True)
 
@@ -1031,26 +1053,54 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         </div>
         """, unsafe_allow_html=True)
 
-    # ============================
-    # ⭐ נוכחים
-    # ============================
+   # ============================
+# ⭐ נוכחים
+# ============================
 
-    st.markdown(
-        '<div class="section-divider"><div class="divider-line"></div>'
-        '<span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span> Present</span>'
-        '<div class="divider-line"></div></div>',
-        unsafe_allow_html=True
-    )
+st.markdown(
+    '<div class="section-divider"><div class="divider-line"></div>'
+    '<span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span> Present</span>'
+    '<div class="divider-line"></div></div>',
+    unsafe_allow_html=True
+)
 
-    if present_students:
-        cols = st.columns(5)
-        for i, (name, data) in enumerate(present_students.items()):
-            with cols[i % 5]:
-                st.image(data["img"], width=110)
-                if data["unknown"]:
-                    st.markdown('<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div>', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;">{name}</div>', unsafe_allow_html=True)
+if present_students:
+    cols = st.columns(5)
+
+    for i, (name, data) in enumerate(present_students.items()):
+        with cols[i % 5]:
+            st.markdown('<div class="student-card">', unsafe_allow_html=True)
+
+            # תמונת הזיהוי מהסריקה
+            st.image(data["img"], width=110)
+
+            if data["unknown"]:
+                st.markdown(
+                    '<div style="text-align:center;color:#ff8c00;font-weight:700;font-size:13px;">Unknown</div>'
+                    '<div style="text-align:center;color:#b07040;font-size:11px;">Not in roster</div>',
+                    unsafe_allow_html=True
+                )
+            else:
+                # ⭐ תמונת השוואה קטנה — חוזרת!
+                if name in reference_photos:
+                    small = reference_photos[name].copy()
+                    small.thumbnail((55, 55))
+
+                    st.markdown(
+                        '<div style="border-top:1px dashed #e4dff0;margin-top:6px;padding-top:4px;'
+                        'display:flex;align-items:center;gap:6px;justify-content:center;">'
+                        '<span style="font-size:9px;color:#a098b8;">📎 ref</span>'
+                        '</div>',
+                        unsafe_allow_html=True
+                    )
+                    st.image(small, width=55)
+
+                st.markdown(
+                    f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;margin-top:4px;">{name}</div>',
+                    unsafe_allow_html=True
+                )
+
+            st.markdown('</div>', unsafe_allow_html=True)
 
     # ============================
     # ⭐ חסרים
